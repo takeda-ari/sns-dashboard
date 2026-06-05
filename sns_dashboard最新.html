@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SNS分析ダッシュボード</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root{--bg:#0d0f14;--surface:#161920;--surface2:#1e2230;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);--text:#e8eaf0;--text2:#8b8fa8;--text3:#555870;--accent:#4f7fff;--green:#2dd4a0;--red:#f05252;--yellow:#f5a623;--purple:#7c5cfc;--pink:#e879a0;--orange:#ff7043;--mono:'DM Mono',monospace;--sans:'Noto Sans JP',sans-serif;}
+*{box-sizing:border-box;margin:0;padding:0}html{font-size:14px}body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh}
+.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+.sidebar{background:var(--surface);border-right:1px solid var(--border);position:sticky;top:0;height:100vh;overflow-y:auto;display:flex;flex-direction:column}
+.main{padding:24px 28px;overflow-x:hidden}
+.logo{padding:18px 20px 14px;border-bottom:1px solid var(--border)}
+.logo-title{font-size:13px;font-weight:700;letter-spacing:.08em}
+.logo-sub{font-size:10px;color:var(--text3);margin-top:2px;font-family:var(--mono)}
+.nav{padding:10px 0;flex:1}
+.nav-label{font-size:10px;color:var(--text3);letter-spacing:.1em;padding:8px 20px 4px;text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:8px;padding:8px 20px;font-size:13px;color:var(--text2);cursor:pointer;transition:all .15s;border-left:2px solid transparent}
+.nav-item:hover{color:var(--text);background:rgba(255,255,255,0.04)}
+.nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(79,127,255,0.08)}
+.nav-item svg{width:15px;height:15px;flex-shrink:0}
+.acct-section{padding:10px 0;border-top:1px solid var(--border)}
+.acct-item{display:flex;align-items:center;gap:8px;padding:7px 20px;font-size:12px;color:var(--text2);cursor:pointer;transition:all .15s}
+.acct-item:hover{color:var(--text);background:rgba(255,255,255,0.04)}
+.acct-item.active{color:var(--text);font-weight:700}
+.acct-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap}
+.page-title{font-size:18px;font-weight:700}
+.page-title span{color:var(--text3);font-size:13px;font-weight:400;margin-left:8px}
+.header-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ctrl-btn{padding:6px 12px;border:1px solid var(--border2);border-radius:6px;background:var(--surface);color:var(--text2);font-size:12px;cursor:pointer;font-family:var(--sans);transition:all .15s;display:inline-flex;align-items:center;gap:5px}
+.ctrl-btn:hover{color:var(--text);background:var(--surface2)}
+.ctrl-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.ctrl-btn.primary:hover{background:#3a6aee}
+select.ctrl-btn{appearance:none;padding-right:22px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238b8fa8'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 7px center}
+.acct-tabs{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
+.acct-tab{display:flex;align-items:center;gap:6px;padding:6px 14px;border:1px solid var(--border2);border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;color:var(--text2)}
+.acct-tab:hover{color:var(--text)}
+.acct-tab.active{color:#fff;border-color:transparent}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-bottom:18px}
+.kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:13px 14px;position:relative;overflow:hidden}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.kpi-label{font-size:10px;color:var(--text3);margin-bottom:5px}
+.kpi-value{font-size:20px;font-weight:700;font-family:var(--mono);line-height:1}
+.kpi-value.sm{font-size:15px}
+.kpi-sub{font-size:10px;color:var(--text3);margin-top:4px}
+.follower-hero{background:var(--surface);border:1.5px solid var(--accent);border-radius:12px;padding:16px 20px;margin-bottom:18px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:center}
+.fh-value{font-size:28px;font-weight:700;font-family:var(--mono);line-height:1}
+.fh-label{font-size:10px;color:var(--text3);margin-bottom:4px}
+.fh-acct{font-size:11px;color:var(--text3);margin-top:3px}
+.fh-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.fh-stat{background:var(--surface2);border-radius:8px;padding:10px 12px}
+.fh-stat-label{font-size:10px;color:var(--text3);margin-bottom:3px}
+.fh-stat-val{font-size:15px;font-weight:700;font-family:var(--mono)}
+.up{color:var(--green)}.down{color:var(--red)}.flat{color:var(--text3)}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.chart-card.wide{grid-column:1/-1}
+.chart-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px}
+.legend-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:6px;font-size:10px;color:var(--text3)}
+.legend-item{display:flex;align-items:center;gap:4px}
+.legend-sq{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.section{margin-bottom:20px}
+.section-title{font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.section-title::before{content:'';display:inline-block;width:3px;height:12px;background:var(--accent);border-radius:2px}
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.table-scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:11px}
+thead th{background:var(--surface2);padding:8px 10px;text-align:right;font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.05em;white-space:nowrap;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1}
+thead th.left{text-align:left}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:rgba(255,255,255,0.025)}
+tbody td{padding:7px 10px;text-align:right;color:var(--text);white-space:nowrap;font-family:var(--mono);font-size:11px}
+tbody td.left{text-align:left;font-family:var(--sans)}
+tbody td.url-cell a{color:var(--accent);text-decoration:none;font-size:10px}
+.week-row td{background:rgba(79,127,255,0.06);font-weight:500}
+.summary-row td{background:var(--surface2);font-weight:700}
+.er-high{color:var(--green)!important}.er-mid{color:var(--yellow)!important}.er-low{color:var(--text2)!important}
+.badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:500;font-family:var(--sans)}
+.compare-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-bottom:18px}
+.compare-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.compare-card-header{padding:11px 15px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)}
+.compare-row{display:flex;justify-content:space-between;padding:6px 15px;border-bottom:1px solid var(--border);font-size:11px}
+.compare-row:last-child{border-bottom:none}
+.compare-key{color:var(--text3)}.compare-val{font-family:var(--mono);font-weight:500}
+.bar-wrap{background:var(--surface2);border-radius:2px;height:3px;margin:6px 15px 0}
+.bar-fill{height:3px;border-radius:2px}
+.filter-bar{display:flex;gap:7px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.search-input{padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface);color:var(--text);font-size:12px;font-family:var(--sans);outline:none;width:170px}
+.search-input:focus{border-color:var(--accent)}
+.search-input::placeholder{color:var(--text3)}
+select.filter-sel{padding:6px 22px 6px 8px;border:1px solid var(--border2);border-radius:6px;background:var(--surface);color:var(--text2);font-size:12px;font-family:var(--sans);cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238b8fa8'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;outline:none}
+.filter-count{font-size:11px;color:var(--text3);margin-left:auto;font-family:var(--mono)}
+.breakdown-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:11px}
+.breakdown-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:13px 14px}
+.breakdown-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.breakdown-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px}
+.breakdown-row:last-child{border-bottom:none}
+.breakdown-key{color:var(--text3)}.breakdown-val{font-family:var(--mono);font-weight:500}
+.tabs{display:flex;gap:2px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:3px;margin-bottom:16px;width:fit-content}
+.tab{padding:5px 13px;border-radius:6px;font-size:12px;font-weight:500;color:var(--text3);cursor:pointer;transition:all .15s}
+.tab:hover{color:var(--text2)}.tab.active{background:var(--surface2);color:var(--text)}
+.import-zone{border:1.5px dashed var(--border2);border-radius:10px;padding:32px;text-align:center;cursor:pointer;transition:all .15s;margin-bottom:14px}
+.import-zone:hover{border-color:var(--accent);background:rgba(79,127,255,0.04)}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form-label{font-size:11px;color:var(--text3);margin-bottom:3px;display:block}
+.form-input{width:100%;padding:7px 9px;border:1px solid var(--border2);border-radius:6px;background:var(--surface);color:var(--text);font-size:12px;font-family:var(--sans);outline:none}
+.form-input:focus{border-color:var(--accent)}
+.fw-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:18px}
+.fw-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:13px 15px}
+.fw-card-title{font-size:11px;font-weight:700;color:var(--text2);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.fw-entry-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.fw-entry-row input{flex:1;padding:5px 7px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-size:11px;font-family:var(--mono);outline:none;min-width:0}
+.fw-entry-row input:focus{border-color:var(--accent)}
+.fw-add-btn{padding:5px 10px;border:1px solid var(--border2);border-radius:5px;background:transparent;color:var(--text2);font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.fw-add-btn:hover{background:var(--surface2);color:var(--text)}
+.fw-history{margin-top:8px;max-height:160px;overflow-y:auto}
+.fw-history-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px}
+.fw-history-row:last-child{border-bottom:none}
+.fw-date{color:var(--text3);font-family:var(--mono)}.fw-num{font-family:var(--mono);font-weight:500}.fw-delta{font-family:var(--mono);font-size:10px}
+.tag-editor{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px}
+.tag-editor-head{background:var(--surface2);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.tag-editor-title{font-size:12px;font-weight:700}
+.tag-bulk-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.tag-bulk-row select{padding:5px 22px 5px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text2);font-size:11px;font-family:var(--sans);cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238b8fa8'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;outline:none}
+.tag-editor-body{max-height:400px;overflow-y:auto}
+.tag-row{display:grid;grid-template-columns:110px 1fr 140px 140px 60px;border-bottom:1px solid var(--border);align-items:center}
+.tag-row:last-child{border-bottom:none}
+.tag-row:hover{background:rgba(255,255,255,0.02)}
+.tag-cell{padding:6px 8px;font-size:11px}
+.tag-cell.url-c{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text3);font-family:var(--mono);font-size:10px}
+.tag-cell select{width:100%;padding:4px 6px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:var(--text);font-size:11px;font-family:var(--sans);outline:none;cursor:pointer}
+.tag-cell select:focus{border-color:var(--accent)}
+.tag-check{display:flex;justify-content:center}
+.tag-check input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:pointer}
+input[type=file]{display:none}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--surface2);border-radius:4px}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="logo"><div class="logo-title">SNS ANALYTICS</div><div class="logo-sub">広報部 週次レポート</div></div>
+  <nav class="nav">
+    <div class="nav-label">メニュー</div>
+    <div class="nav-item active" onclick="showPage('dash',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>ダッシュボード</div>
+    <div class="nav-item" onclick="showPage('followers',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>フォロワー管理</div>
+    <div class="nav-item" onclick="showPage('compare',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>アカウント比較</div>
+    <div class="nav-item" onclick="showPage('posts',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>投稿一覧</div>
+    <div class="nav-item" onclick="showPage('breakdown',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>部門・ジャンル別</div>
+    <div class="nav-item" onclick="showPage('import',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>CSVインポート</div>
+  </nav>
+  <div class="acct-section"><div class="nav-label">アカウント</div><div id="sidebarAccts"></div></div>
+</aside>
+<main class="main">
+
+<div id="page-dash">
+  <div class="page-header">
+    <div class="page-title">ダッシュボード <span id="dashSubtitle"></span></div>
+    <div class="header-controls">
+      <select class="ctrl-btn" id="monthSel" onchange="renderDash()"><option value="all">全期間</option></select>
+      <button class="ctrl-btn" onclick="downloadCSV()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>エクスポート</button>
+    </div>
+  </div>
+  <div class="acct-tabs" id="dashAcctTabs"></div>
+  <div id="followerHeroArea"></div>
+  <div class="kpi-grid" id="kpiGrid"></div>
+  <div class="charts-grid">
+    <div class="chart-card"><div class="chart-label">インプレッション 週別推移</div><div style="position:relative;height:155px"><canvas id="impChart" role="img" aria-label="IMP推移"></canvas></div></div>
+    <div class="chart-card"><div class="chart-label">エンゲージメント率（%）</div><div style="position:relative;height:155px"><canvas id="erChart" role="img" aria-label="ER推移"></canvas></div></div>
+    <div class="chart-card"><div class="chart-label">いいね / RT / リプライ</div><div id="reactionLegend" class="legend-row"></div><div style="position:relative;height:135px"><canvas id="reactionChart" role="img" aria-label="反応数"></canvas></div></div>
+    <div class="chart-card"><div class="chart-label">部門別インプレッション</div><div style="position:relative;height:155px"><canvas id="deptChart" role="img" aria-label="部門別"></canvas></div></div>
+    <div class="chart-card wide"><div class="chart-label">URLクリック / プロフィールCL / メディア再生</div><div id="clickLegend" class="legend-row"></div><div style="position:relative;height:120px"><canvas id="clickChart" role="img" aria-label="クリック系"></canvas></div></div>
+  </div>
+  <div class="section"><div class="section-title">週別集計</div>
+    <div class="table-wrap"><div class="table-scroll"><table><thead><tr>
+      <th class="left">期間</th><th>IMP</th><th>エンゲージ</th><th>ER%</th><th>RT</th><th>リプライ</th><th>いいね</th><th>プロフCL</th><th>URL CL</th><th>詳細CL</th><th>メディア再生</th>
+    </tr></thead><tbody id="weekBody"></tbody></table></div></div>
+  </div>
+</div>
+
+<div id="page-followers" style="display:none">
+  <div class="page-header"><div class="page-title">フォロワー管理</div></div>
+  <div class="kpi-grid" id="fwKpiGrid"></div>
+  <div class="section"><div class="section-title">週次フォロワー数を記録</div><div class="fw-grid" id="fwInputGrid"></div></div>
+  <div class="chart-card wide" style="margin-bottom:18px"><div class="chart-label">フォロワー数 週別推移</div><div id="fwChartLegend" class="legend-row"></div><div style="position:relative;height:200px"><canvas id="fwTrendChart" role="img" aria-label="フォロワー推移"></canvas></div></div>
+  <div class="chart-card wide" style="margin-bottom:18px"><div class="chart-label">週次増加数</div><div id="fwDeltaLegend" class="legend-row"></div><div style="position:relative;height:160px"><canvas id="fwDeltaChart" role="img" aria-label="週次増加数"></canvas></div></div>
+  <div class="section"><div class="section-title">フォロワー推移テーブル</div><div class="table-wrap"><div class="table-scroll"><table id="fwTable"></table></div></div></div>
+</div>
+
+<div id="page-compare" style="display:none">
+  <div class="page-header"><div class="page-title">アカウント比較</div><div class="header-controls"><select class="ctrl-btn" id="cmpMonthSel" onchange="renderCompare()"><option value="all">全期間</option></select></div></div>
+  <div class="compare-grid" id="compareCards"></div>
+  <div class="charts-grid" style="margin-bottom:18px">
+    <div class="chart-card wide"><div class="chart-label">インプレッション比較（週別）</div><div id="cmpImpLegend" class="legend-row"></div><div style="position:relative;height:190px"><canvas id="cmpImpChart" role="img" aria-label="IMP比較"></canvas></div></div>
+    <div class="chart-card"><div class="chart-label">エンゲージメント率 比較</div><div id="cmpErLegend" class="legend-row"></div><div style="position:relative;height:160px"><canvas id="cmpErChart" role="img" aria-label="ER比較"></canvas></div></div>
+    <div class="chart-card"><div class="chart-label">いいね数 比較</div><div id="cmpLikeLegend" class="legend-row"></div><div style="position:relative;height:160px"><canvas id="cmpLikeChart" role="img" aria-label="いいね比較"></canvas></div></div>
+  </div>
+  <div class="section"><div class="section-title">全指標 比較表</div><div class="table-wrap"><div class="table-scroll"><table id="cmpTable"></table></div></div></div>
+</div>
+
+<div id="page-posts" style="display:none">
+  <div class="page-header"><div class="page-title">投稿一覧</div></div>
+  <div class="filter-bar">
+    <input type="text" class="search-input" id="searchInput" placeholder="URL・部門で検索..." oninput="renderPosts()">
+    <select class="filter-sel" id="filterAcct" onchange="renderPosts()"><option value="">全アカウント</option></select>
+    <select class="filter-sel" id="filterDept" onchange="renderPosts()"><option value="">全部門</option></select>
+    <select class="filter-sel" id="filterGenre" onchange="renderPosts()"><option value="">全ジャンル</option></select>
+    <select class="filter-sel" id="filterMonth2" onchange="renderPosts()"><option value="">全期間</option></select>
+    <span class="filter-count" id="filterCount"></span>
+  </div>
+  <div class="table-wrap"><div class="table-scroll" style="max-height:560px;overflow-y:auto"><table><thead><tr>
+    <th class="left">日付</th><th class="left">アカウント</th><th class="left">部門</th><th class="left">ジャンル</th><th class="left">URL</th>
+    <th>IMP</th><th>エンゲージ</th><th>ER%</th><th>RT</th><th>リプライ</th><th>いいね</th><th>プロフCL</th><th>URL CL</th><th>詳細CL</th><th>メディア再生</th>
+  </tr></thead><tbody id="postBody"></tbody></table></div></div>
+</div>
+
+<div id="page-breakdown" style="display:none">
+  <div class="page-header"><div class="page-title">部門・ジャンル別集計</div>
+    <div class="header-controls">
+      <select class="ctrl-btn" id="brkAcctSel" onchange="renderBreakdown()"><option value="all">全アカウント</option></select>
+      <select class="ctrl-btn" id="brkMonthSel" onchange="renderBreakdown()"><option value="all">全期間</option></select>
+    </div>
+  </div>
+  <div class="tabs"><div class="tab active" onclick="switchBreakTab('dept',this)">部門別</div><div class="tab" onclick="switchBreakTab('genre',this)">ジャンル別</div></div>
+  <div id="breakdownContent"></div>
+</div>
+
+<div id="page-import" style="display:none">
+  <div class="page-header"><div class="page-title">CSVインポート</div>
+    <div class="header-controls">
+      <span id="syncStatus" style="font-size:12px;font-family:var(--mono);color:var(--text3)"></span>
+      <button class="ctrl-btn" onclick="loadFromSheet()" title="スプレッドシートから再読み込み">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        再読み込み
+      </button>
+    </div>
+  </div>
+  <!-- GAS設定状態 -->
+  <div id="gasStatusBox" style="margin-bottom:16px;padding:12px 16px;border-radius:10px;font-size:12px;line-height:1.8"></div>
+
+  <div class="section"><div class="section-title">X Analytics CSV（公式ダウンロード）</div>
+    <div class="table-wrap" style="padding:16px;margin-bottom:12px">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Shift-JIS / UTF-8 自動対応。インポート後に部門・ジャンルを設定できます。</p>
+      <div class="form-grid" style="margin-bottom:12px">
+        <div>
+          <label class="form-label">アカウント選択（必須）</label>
+          <select class="form-input" id="impAcct">
+            <option value="">-- 選択してください --</option>
+            <option value="DetonatioN">DetonatioN</option>
+            <option value="VALORANT">VALORANT</option>
+            <option value="第五人格">第五人格</option>
+            <option value="esports">esports</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:flex-end"><p style="font-size:11px;color:var(--text3);line-height:1.6">部門・ジャンルはインポート後に<br>個別または一括で設定できます</p></div>
+      </div>
+      <div class="import-zone" onclick="document.getElementById('xCsvFile').click()" id="xDropZone">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="1.5" style="margin:0 auto 8px;display:block"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px">X Analytics CSVをドロップ or クリック</div>
+        <div style="font-size:11px;color:var(--text3)">Shift-JIS・UTF-8 自動判別</div>
+      </div>
+      <input type="file" id="xCsvFile" accept=".csv" onchange="handleXCsv(this.files[0])">
+    </div>
+  </div>
+  <div id="importMsg" style="margin-bottom:12px;font-size:12px;min-height:20px"></div>
+  <div id="tagEditorSection" style="display:none">
+    <div class="section-title">部門・ジャンルを設定</div>
+    <div class="tag-editor">
+      <div class="tag-editor-head">
+        <div class="tag-editor-title" id="tagEditorTitle">インポートデータ</div>
+        <div class="tag-bulk-row">
+          <span style="font-size:11px;color:var(--text3)">チェック済みに一括：</span>
+          <select id="bulkDept" onchange="bulkSet('dept')"><option value="">部門を選択</option></select>
+          <select id="bulkGenre" onchange="bulkSet('genre')"><option value="">ジャンルを選択</option></select>
+          <button class="ctrl-btn" onclick="checkAll(true)" style="font-size:11px;padding:4px 8px">全選択</button>
+          <button class="ctrl-btn" onclick="checkAll(false)" style="font-size:11px;padding:4px 8px">全解除</button>
+        </div>
+      </div>
+      <div class="tag-editor-body">
+        <div class="tag-row" style="background:var(--surface2)">
+          <div class="tag-cell" style="font-size:10px;color:var(--text3);font-weight:700">日付</div>
+          <div class="tag-cell" style="font-size:10px;color:var(--text3);font-weight:700">URL</div>
+          <div class="tag-cell" style="font-size:10px;color:var(--text3);font-weight:700">部門</div>
+          <div class="tag-cell" style="font-size:10px;color:var(--text3);font-weight:700">ジャンル</div>
+          <div class="tag-cell tag-check" style="font-size:10px;color:var(--text3);font-weight:700">選択</div>
+        </div>
+        <div id="tagEditorRows"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="ctrl-btn primary" onclick="commitTagged()">確定してインポート</button>
+      <button class="ctrl-btn" onclick="cancelTag()">キャンセル</button>
+    </div>
+  </div>
+  <div id="importedDataSection" style="display:none;margin-top:20px">
+    <div class="section-title">読み込み済みデータ</div>
+    <div class="kpi-grid" id="importedStats"></div>
+    <div style="margin-top:8px;display:flex;gap:8px">
+      <button class="ctrl-btn" onclick="loadSample()">サンプルデータ読み込み</button>
+      <button class="ctrl-btn" style="color:var(--red);border-color:var(--red)" onclick="clearAllData()">全データ削除</button>
+    </div>
+  </div>
+</div>
+
+</main>
+</div>
+<script>
+// ============================================================
+// GAS API URL — セットアップ後にここを書き換えてください
+// ============================================================
+const GAS_API_URL = 'YOUR_GAS_URL_HERE';
+// ============================================================
+
+const ACCOUNTS=[{name:'DetonatioN',color:'#4f7fff'},{name:'VALORANT',color:'#e879a0'},{name:'第五人格',color:'#2dd4a0'},{name:'esports',color:'#f5a623'}];
+const DEPTS=['LoL','VALORANT','Fortnite','スマブラ','格ゲー','シャドバ','ストリーマー','ポケモンユナイト','第五人格','2XKO','その他'];
+const GENRES=['チーム情報','大会情報','イベント情報','キャンペーン情報','スポンサー関連','DFM CREW','DFM PARK','日常','現地画像','動画','出演情報','その他','グッズ','はこおし','広報施策関連','外部案件'];
+const DCOL={'LoL':'#4f7fff','VALORANT':'#e879a0','Fortnite':'#2dd4a0','スマブラ':'#f5a623','格ゲー':'#7c5cfc','シャドバ':'#ff7043','ストリーマー':'#38bdf8','ポケモンユナイト':'#a3e635','第五人格':'#fb7185','2XKO':'#818cf8','その他':'#8b8fa8'};
+const PAL=['#4f7fff','#7c5cfc','#2dd4a0','#f5a623','#e879a0','#ff7043','#38bdf8','#818cf8'];
+function deptColor(d){return DCOL[d]||'#8b8fa8';}
+function acctColor(n){return ACCOUNTS.find(a=>a.name===n)?.color||'#8b8fa8';}
+let allData=[],followerLog={},pendingRows=[],currentDashAcct='all',currentBreakTab='dept',charts={};
+function fmt(n){if(n==null||isNaN(n))return'-';return Math.round(n).toLocaleString('ja-JP');}
+function fmtP(n){if(n==null||isNaN(n))return'-';return n.toFixed(2)+'%';}
+function fmtK(n){if(n==null||isNaN(n))return'-';if(Math.abs(n)>=1e6)return(n/1e6).toFixed(1)+'M';if(Math.abs(n)>=1000)return(n/1000).toFixed(1)+'K';return Math.round(n).toString();}
+function erc(er){return er>=8?'er-high':er>=4?'er-mid':'er-low';}
+
+function showPage(name,el){
+  document.querySelectorAll('[id^="page-"]').forEach(p=>p.style.display='none');
+  document.getElementById('page-'+name).style.display='';
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  if(el)el.classList.add('active');
+  if(name==='dash')renderDash();
+  if(name==='followers'){syncSel();renderFollowers();}
+  if(name==='compare'){syncSel();renderCompare();}
+  if(name==='posts'){syncSel();renderPosts();}
+  if(name==='breakdown'){syncSel();renderBreakdown();}
+  if(name==='import')renderImpStats();
+}
+function renderSidebar(){
+  document.getElementById('sidebarAccts').innerHTML=
+    [{name:'all',color:'#8b8fa8',label:'すべて'},...ACCOUNTS.map(a=>({...a,label:a.name}))].map(a=>
+    `<div class="acct-item ${currentDashAcct===a.name?'active':''}" onclick="selAcct('${a.name}')"><span class="acct-dot" style="background:${a.color}"></span>${a.label}</div>`).join('');
+}
+function renderDashTabs(){
+  document.getElementById('dashAcctTabs').innerHTML=
+    [{name:'all',color:'#8b8fa8',label:'すべて'},...ACCOUNTS.map(a=>({...a,label:a.name}))].map(t=>
+    `<div class="acct-tab ${currentDashAcct===t.name?'active':''}" style="${currentDashAcct===t.name?`background:${t.color};border-color:${t.color}`:''}" onclick="selAcct('${t.name}')"><span class="acct-dot" style="background:${currentDashAcct===t.name?'rgba(255,255,255,.55)':t.color}"></span>${t.label}</div>`).join('');
+}
+function selAcct(n){currentDashAcct=n;renderSidebar();renderDashTabs();renderDash();}
+function syncSel(){
+  const months=[...new Set(allData.map(d=>d.date.substring(0,7)))].sort().reverse();
+  const an=ACCOUNTS.map(a=>a.name);
+  [{id:'monthSel',ao:'<option value="all">全期間</option>',opts:months},{id:'cmpMonthSel',ao:'<option value="all">全期間</option>',opts:months},{id:'filterMonth2',ao:'<option value="">全期間</option>',opts:months},{id:'brkMonthSel',ao:'<option value="all">全期間</option>',opts:months}].forEach(c=>{
+    const el=document.getElementById(c.id);if(!el)return;const cur=el.value;
+    el.innerHTML=c.ao+c.opts.map(m=>`<option value="${m}">${m}</option>`).join('');el.value=cur;
+  });
+  [{id:'filterAcct',ao:'<option value="">全アカウント</option>',opts:an},{id:'brkAcctSel',ao:'<option value="all">全アカウント</option>',opts:an}].forEach(c=>{
+    const el=document.getElementById(c.id);if(!el)return;const cur=el.value;
+    el.innerHTML=c.ao+c.opts.map(n=>`<option>${n}</option>`).join('');el.value=cur;
+  });
+  const ud=[...new Set(allData.map(d=>d.dept))].filter(Boolean).sort();
+  const ug=[...new Set(allData.map(d=>d.genre))].filter(Boolean).sort();
+  document.getElementById('filterDept').innerHTML='<option value="">全部門</option>'+ud.map(d=>`<option>${d}</option>`).join('');
+  document.getElementById('filterGenre').innerHTML='<option value="">全ジャンル</option>'+ug.map(g=>`<option>${g}</option>`).join('');
+  const bd=document.getElementById('bulkDept'),bg=document.getElementById('bulkGenre');
+  if(bd)bd.innerHTML='<option value="">部門を選択</option>'+DEPTS.map(d=>`<option>${d}</option>`).join('');
+  if(bg)bg.innerHTML='<option value="">ジャンルを選択</option>'+GENRES.map(g=>`<option>${g}</option>`).join('');
+}
+function filt(month,acct){
+  let d=allData;
+  if(acct&&acct!=='all'&&acct!=='')d=d.filter(r=>r.account===acct);
+  if(month&&month!=='all'&&month!=='')d=d.filter(r=>r.date.startsWith(month));
+  return d;
+}
+function stats(rows){
+  if(!rows||!rows.length)return null;
+  const sum=k=>rows.reduce((s,r)=>s+(r[k]||0),0);
+  const imp=sum('impressions'),eng=sum('engagements');
+  return{count:rows.length,imp,eng,er:imp>0?(eng/imp*100):0,rt:sum('rt'),reply:sum('reply'),likes:sum('likes'),prof:sum('profile_click'),urlCl:sum('url_click'),detail:sum('detail_click'),media:sum('media_play'),avgImp:imp/rows.length,avgEng:eng/rows.length,medImp:med(rows.map(r=>r.impressions))};
+}
+function med(arr){const s=[...arr].sort((a,b)=>a-b);const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2;}
+function weeks(rows){
+  const wk={};
+  rows.forEach(r=>{
+    const dt=new Date(r.date.substring(0,10));const day=dt.getDay();
+    const mon=new Date(dt);mon.setDate(dt.getDate()-(day===0?6:day-1));
+    const key=mon.toISOString().substring(0,10);
+    if(!wk[key])wk[key]={start:new Date(mon),end:new Date(mon.getFullYear(),mon.getMonth(),mon.getDate()+6),rows:[]};
+    wk[key].rows.push(r);
+  });
+  return Object.entries(wk).sort((a,b)=>a[0].localeCompare(b[0]));
+}
+function dchart(keys){(keys||Object.keys(charts)).forEach(k=>{if(charts[k]){try{charts[k].destroy()}catch(e){}delete charts[k];}});}
+function bOpts(){return{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#555870',font:{size:9},maxRotation:45,autoSkip:false}},y:{grid:{color:'rgba(255,255,255,0.06)'},ticks:{color:'#555870',font:{size:9}}}}};}
+
+function renderDash(){
+  renderDashTabs();
+  const month=document.getElementById('monthSel')?.value||'all';
+  const rows=filt(month,currentDashAcct);
+  document.getElementById('dashSubtitle').textContent=(currentDashAcct==='all'?'全アカウント':currentDashAcct)+(month!=='all'?' / '+month:'');
+  renderFwHero();renderKPI(rows);renderWeekTable(rows);renderDashCharts(rows);
+}
+function renderFwHero(){
+  const el=document.getElementById('followerHeroArea');
+  const acct=currentDashAcct==='all'?ACCOUNTS[0].name:currentDashAcct;
+  const log=(followerLog[acct]||[]).sort((a,b)=>a.date.localeCompare(b.date));
+  if(!log.length){el.innerHTML='';return;}
+  const lat=log[log.length-1];const prev=log.length>=2?log[log.length-2]:null;
+  const delta=prev?lat.count-prev.count:null;const dr=prev&&prev.count>0?((delta/prev.count)*100):null;
+  const color=acctColor(acct);
+  el.innerHTML=`<div class="follower-hero" style="border-color:${color}">
+    <div><div class="fh-label">フォロワー数（最新）</div><div class="fh-value">${fmt(lat.count)}</div><div class="fh-acct">${acct} / ${lat.date}</div>${delta!==null?`<div style="margin-top:6px;font-size:12px;font-family:var(--mono)" class="${delta>=0?'up':'down'}">${delta>=0?'▲':'▼'} ${fmt(Math.abs(delta))}人 (${dr>=0?'+':''}${dr.toFixed(1)}%) 前回比</div>`:''}</div>
+    <div class="fh-stats">
+      <div class="fh-stat"><div class="fh-stat-label">前回比 増加数</div><div class="fh-stat-val ${delta!==null?(delta>=0?'up':'down'):'flat'}">${delta!==null?(delta>=0?'+':'')+fmt(delta):'—'}</div></div>
+      <div class="fh-stat"><div class="fh-stat-label">前回比 増加率</div><div class="fh-stat-val ${dr!==null?(dr>=0?'up':'down'):'flat'}">${dr!==null?(dr>=0?'+':'')+dr.toFixed(2)+'%':'—'}</div></div>
+      <div class="fh-stat"><div class="fh-stat-label">期間最高</div><div class="fh-stat-val">${fmt(Math.max(...log.map(l=>l.count)))}</div></div>
+      <div class="fh-stat"><div class="fh-stat-label">記録週数</div><div class="fh-stat-val">${log.length}週</div></div>
+    </div>
+    <div style="position:relative;height:70px"><canvas id="fwSparkChart" role="img" aria-label="スパーク"></canvas></div>
+  </div>`;
+  setTimeout(()=>{const c=document.getElementById('fwSparkChart');if(!c)return;if(charts.fwSpark){charts.fwSpark.destroy();delete charts.fwSpark;}charts.fwSpark=new Chart(c,{type:'line',data:{labels:log.map(l=>l.date),datasets:[{data:log.map(l=>l.count),borderColor:color,backgroundColor:color+'22',fill:true,tension:0.4,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{display:false}}}});},60);
+}
+function renderKPI(rows){
+  const s=stats(rows);const el=document.getElementById('kpiGrid');
+  if(!s){el.innerHTML='<div style="color:var(--text3);font-size:12px;padding:20px;grid-column:1/-1">データがありません。「CSVインポート」からデータを読み込んでください。</div>';return;}
+  el.innerHTML=[{l:'インプレッション合計',v:fmtK(s.imp),s:`平均 ${fmtK(s.avgImp)} / 中央値 ${fmtK(s.medImp)}`,c:'#4f7fff'},{l:'エンゲージメント率',v:fmtP(s.er),s:`エンゲージ計 ${fmtK(s.eng)}`,c:'#2dd4a0'},{l:'いいね数',v:fmtK(s.likes),s:`RT ${fmtK(s.rt)} / リプライ ${fmtK(s.reply)}`,c:'#e879a0'},{l:'URLクリック',v:fmtK(s.urlCl),s:`詳細CL ${fmtK(s.detail)}`,c:'#f5a623'},{l:'プロフィールCL',v:fmtK(s.prof),s:'',c:'#7c5cfc'},{l:'メディア再生',v:fmtK(s.media),s:`投稿数 ${s.count}件`,c:'#ff7043'}]
+    .map(c=>`<div class="kpi-card"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:${c.c}"></div><div class="kpi-label">${c.l}</div><div class="kpi-value ${c.v.length>7?'sm':''}">${c.v}</div><div class="kpi-sub">${c.s}</div></div>`).join('');
+}
+function renderWeekTable(rows){
+  const wk=weeks(rows);const fd=d=>`${d.getMonth()+1}/${d.getDate()}`;const tot=stats(rows);let h='';
+  if(tot){
+    h+=`<tr class="summary-row"><td class="left">月合計</td><td>${fmt(tot.imp)}</td><td>${fmt(tot.eng)}</td><td class="${erc(tot.er)}">${fmtP(tot.er)}</td><td>${fmt(tot.rt)}</td><td>${fmt(tot.reply)}</td><td>${fmt(tot.likes)}</td><td>${fmt(tot.prof)}</td><td>${fmt(tot.urlCl)}</td><td>${fmt(tot.detail)}</td><td>${fmt(tot.media)}</td></tr>`;
+    h+=`<tr class="summary-row"><td class="left">月平均値</td><td>${fmt(tot.avgImp)}</td><td>${fmt(tot.avgEng)}</td><td class="${erc(tot.er)}">${fmtP(tot.er)}</td><td>${fmt(tot.rt/tot.count)}</td><td>${fmt(tot.reply/tot.count)}</td><td>${fmt(tot.likes/tot.count)}</td><td>${fmt(tot.prof/tot.count)}</td><td>${fmt(tot.urlCl/tot.count)}</td><td>${fmt(tot.detail/tot.count)}</td><td>${fmt(tot.media/tot.count)}</td></tr>`;
+    h+=`<tr class="summary-row"><td class="left">月中央値</td><td>${fmt(tot.medImp)}</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
+  }
+  wk.forEach(([,w])=>{const ws=stats(w.rows);if(!ws)return;h+=`<tr class="week-row"><td class="left">${fd(w.start)}〜${fd(w.end)}</td><td>${fmt(ws.imp)}</td><td>${fmt(ws.eng)}</td><td class="${erc(ws.er)}">${fmtP(ws.er)}</td><td>${fmt(ws.rt)}</td><td>${fmt(ws.reply)}</td><td>${fmt(ws.likes)}</td><td>${fmt(ws.prof)}</td><td>${fmt(ws.urlCl)}</td><td>${fmt(ws.detail)}</td><td>${fmt(ws.media)}</td></tr>`;});
+  document.getElementById('weekBody').innerHTML=h;
+}
+function renderDashCharts(rows){
+  dchart(['imp','er','reaction','dept','click']);
+  const wk=weeks(rows);const labels=wk.map(([,w])=>`${w.start.getMonth()+1}/${w.start.getDate()}`);
+  const get=k=>wk.map(([,w])=>stats(w.rows)?.[k]||0);
+  const color=currentDashAcct==='all'?'#4f7fff':acctColor(currentDashAcct);
+  charts.imp=new Chart(document.getElementById('impChart'),{type:'bar',data:{labels,datasets:[{data:get('imp'),backgroundColor:color+'55',borderColor:color,borderWidth:1.5,borderRadius:3}]},options:bOpts()});
+  charts.er=new Chart(document.getElementById('erChart'),{type:'line',data:{labels,datasets:[{data:wk.map(([,w])=>+((stats(w.rows)?.er||0).toFixed(2))),borderColor:'#2dd4a0',backgroundColor:'#2dd4a018',fill:true,tension:0.4,pointRadius:3,pointBackgroundColor:'#2dd4a0'}]},options:bOpts()});
+  document.getElementById('reactionLegend').innerHTML=[['いいね','#e879a0'],['RT','#4f7fff'],['リプライ','#7c5cfc']].map(([l,c])=>`<span class="legend-item"><span class="legend-sq" style="background:${c}"></span>${l}</span>`).join('');
+  charts.reaction=new Chart(document.getElementById('reactionChart'),{type:'bar',data:{labels,datasets:[{data:get('likes'),backgroundColor:'#e879a055',borderColor:'#e879a0',borderWidth:1,borderRadius:2},{data:get('rt'),backgroundColor:'#4f7fff55',borderColor:'#4f7fff',borderWidth:1,borderRadius:2},{data:get('reply'),backgroundColor:'#7c5cfc55',borderColor:'#7c5cfc',borderWidth:1,borderRadius:2}]},options:bOpts()});
+  const dm={};rows.forEach(r=>{if(!dm[r.dept])dm[r.dept]=0;dm[r.dept]+=r.impressions||0;});
+  const de=Object.entries(dm).filter(([k])=>k).sort((a,b)=>b[1]-a[1]);
+  if(de.length){charts.dept=new Chart(document.getElementById('deptChart'),{type:'doughnut',data:{labels:de.map(d=>d[0]),datasets:[{data:de.map(d=>d[1]),backgroundColor:de.map(d=>deptColor(d[0])+'cc'),borderColor:de.map(d=>deptColor(d[0])),borderWidth:1.5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'right',labels:{color:'#8b8fa8',font:{size:9},boxWidth:7,padding:6}}}}});}
+  document.getElementById('clickLegend').innerHTML=[['URLクリック','#f5a623'],['プロフCL','#7c5cfc'],['メディア再生','#38bdf8']].map(([l,c])=>`<span class="legend-item"><span class="legend-sq" style="background:${c}"></span>${l}</span>`).join('');
+  charts.click=new Chart(document.getElementById('clickChart'),{type:'line',data:{labels,datasets:[{data:get('urlCl'),borderColor:'#f5a623',fill:false,tension:0.4,pointRadius:2,borderWidth:1.5},{data:get('prof'),borderColor:'#7c5cfc',fill:false,tension:0.4,pointRadius:2,borderWidth:1.5,borderDash:[4,3]},{data:get('media'),borderColor:'#38bdf8',fill:false,tension:0.4,pointRadius:2,borderWidth:1.5,borderDash:[2,4]}]},options:bOpts()});
+}
+
+function renderFollowers(){
+  renderFwKpi();renderFwInputGrid();renderFwCharts();renderFwTable();
+}
+function renderFwKpi(){
+  document.getElementById('fwKpiGrid').innerHTML=ACCOUNTS.map(a=>{
+    const log=(followerLog[a.name]||[]).sort((x,y)=>x.date.localeCompare(y.date));
+    if(!log.length)return`<div class="kpi-card"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:${a.color}"></div><div class="kpi-label">${a.name}</div><div class="kpi-value sm" style="color:var(--text3)">未記録</div></div>`;
+    const lat=log[log.length-1];const prev=log.length>=2?log[log.length-2]:null;const delta=prev?lat.count-prev.count:null;
+    return`<div class="kpi-card"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:${a.color}"></div><div class="kpi-label">${a.name}</div><div class="kpi-value">${fmtK(lat.count)}</div><div class="kpi-sub ${delta!==null?(delta>=0?'up':'down'):'flat'}">${delta!==null?(delta>=0?'▲':'▼')+fmt(Math.abs(delta))+'人':'初回'} / ${lat.date}</div></div>`;
+  }).join('');
+}
+function renderFwInputGrid(){
+  document.getElementById('fwInputGrid').innerHTML=ACCOUNTS.map(a=>{
+    const log=(followerLog[a.name]||[]).sort((x,y)=>y.date.localeCompare(x.date));
+    const hist=log.map((e,i)=>{const n=log[i+1];const d=n?e.count-n.count:null;const cls=d!==null?(d>=0?'up':'down'):'flat';return`<div class="fw-history-row"><span class="fw-date">${e.date}</span><span class="fw-num">${fmt(e.count)}</span><span class="fw-delta ${cls}">${d!==null?(d>=0?'+':'')+fmt(d):'初回'}</span></div>`;}).join('');
+    return`<div class="fw-card"><div class="fw-card-title"><span class="acct-dot" style="background:${a.color}"></span>${a.name}</div><div class="fw-entry-row"><input type="date" id="fwD_${a.name}" value="${new Date().toISOString().substring(0,10)}"><input type="number" id="fwC_${a.name}" placeholder="フォロワー数"><button class="fw-add-btn" onclick="addFw('${a.name}')">記録</button></div><div class="fw-history">${hist||'<div style="color:var(--text3);font-size:11px;padding:6px 0">記録なし</div>'}</div></div>`;
+  }).join('');
+}
+function addFw(name){
+  const date=document.getElementById('fwD_'+name)?.value;const count=parseInt(document.getElementById('fwC_'+name)?.value);
+  if(!date||isNaN(count)||count<0)return;
+  if(!followerLog[name])followerLog[name]=[];
+  const idx=followerLog[name].findIndex(e=>e.date===date);
+  if(idx>=0)followerLog[name][idx].count=count;else followerLog[name].push({date,count});
+  document.getElementById('fwC_'+name).value='';
+  renderFollowers();
+  if(document.getElementById('page-dash').style.display!=='none')renderFwHero();
+  saveFollowerToSheet(name,date,count);
+}
+function renderFwCharts(){
+  dchart(['fwTrend','fwDelta']);
+  const allD=[...new Set(ACCOUNTS.flatMap(a=>(followerLog[a.name]||[]).map(e=>e.date)))].sort();
+  if(!allD.length)return;
+  const labels=allD.map(d=>{const dt=new Date(d);return`${dt.getMonth()+1}/${dt.getDate()}`;});
+  const mkDS=()=>ACCOUNTS.map(a=>{const m={};(followerLog[a.name]||[]).forEach(e=>m[e.date]=e.count);return{label:a.name,data:allD.map(d=>m[d]??null),borderColor:a.color,backgroundColor:a.color+'22',fill:false,tension:0.4,pointRadius:3,borderWidth:2,spanGaps:true};});
+  const mkDD=()=>ACCOUNTS.map(a=>{const s=(followerLog[a.name]||[]).sort((x,y)=>x.date.localeCompare(y.date));const m={};s.forEach((e,i)=>{if(i>0)m[e.date]=e.count-s[i-1].count;});return{label:a.name,data:allD.map(d=>m[d]??null),borderColor:a.color,backgroundColor:a.color+'33',fill:false,tension:0.4,pointRadius:3,borderWidth:2,spanGaps:false};});
+  const mkLeg=id=>document.getElementById(id).innerHTML=ACCOUNTS.map(a=>`<span class="legend-item"><span class="legend-sq" style="background:${a.color}"></span>${a.name}</span>`).join('');
+  mkLeg('fwChartLegend');mkLeg('fwDeltaLegend');
+  charts.fwTrend=new Chart(document.getElementById('fwTrendChart'),{type:'line',data:{labels,datasets:mkDS()},options:bOpts()});
+  charts.fwDelta=new Chart(document.getElementById('fwDeltaChart'),{type:'bar',data:{labels,datasets:mkDD()},options:{...bOpts(),plugins:{legend:{display:false}}}});
+}
+function renderFwTable(){
+  const allD=[...new Set(ACCOUNTS.flatMap(a=>(followerLog[a.name]||[]).map(e=>e.date)))].sort();
+  if(!allD.length){document.getElementById('fwTable').innerHTML='<tr><td style="padding:20px;color:var(--text3);font-size:12px">フォロワーデータがありません</td></tr>';return;}
+  const th=`<thead><tr><th class="left">日付</th>${ACCOUNTS.map(a=>`<th style="color:${a.color};text-align:right">${a.name}</th><th style="color:${a.color};text-align:right;opacity:.6">前回比</th>`).join('')}</tr></thead>`;
+  const rows=allD.map(d=>{
+    const cells=ACCOUNTS.map(a=>{
+      const log=(followerLog[a.name]||[]).sort((x,y)=>x.date.localeCompare(y.date));const entry=log.find(e=>e.date===d);if(!entry)return'<td>-</td><td>-</td>';
+      const idx=log.indexOf(entry);const prev=idx>0?log[idx-1]:null;const delta=prev?entry.count-prev.count:null;const cls=delta!==null?(delta>=0?'up':'down'):'flat';
+      return`<td>${fmt(entry.count)}</td><td class="${cls}">${delta!==null?(delta>=0?'+':'')+fmt(delta):'-'}</td>`;
+    }).join('');
+    return`<tr><td class="left" style="font-family:var(--mono)">${d}</td>${cells}</tr>`;
+  }).join('');
+  document.getElementById('fwTable').innerHTML=th+`<tbody>${rows}</tbody>`;
+}
+
+function renderCompare(){
+  const month=document.getElementById('cmpMonthSel')?.value||'all';
+  const sa=ACCOUNTS.map(a=>({acct:a,s:stats(filt(month,a.name))}));
+  const maxI=Math.max(...sa.map(x=>x.s?.imp||0));
+  document.getElementById('compareCards').innerHTML=sa.map(({acct,s})=>{
+    if(!s)return`<div class="compare-card"><div class="compare-card-header" style="border-left:3px solid ${acct.color}"><span class="acct-dot" style="background:${acct.color}"></span><span style="font-size:13px;font-weight:700">${acct.name}</span></div><div style="padding:14px;font-size:12px;color:var(--text3)">データなし</div></div>`;
+    const pct=maxI>0?(s.imp/maxI*100):0;
+    return`<div class="compare-card"><div class="compare-card-header" style="border-left:3px solid ${acct.color}"><span class="acct-dot" style="background:${acct.color}"></span><div><div style="font-size:13px;font-weight:700">${acct.name}</div><div style="font-size:10px;color:var(--text3);font-family:var(--mono)">${s.count}件</div></div></div>
+    <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${acct.color}"></div></div>
+    <div class="compare-row"><span class="compare-key">インプレッション</span><span class="compare-val">${fmt(s.imp)}</span></div>
+    <div class="compare-row"><span class="compare-key">エンゲージメント率</span><span class="compare-val ${erc(s.er)}">${fmtP(s.er)}</span></div>
+    <div class="compare-row"><span class="compare-key">いいね</span><span class="compare-val">${fmt(s.likes)}</span></div>
+    <div class="compare-row"><span class="compare-key">RT</span><span class="compare-val">${fmt(s.rt)}</span></div>
+    <div class="compare-row"><span class="compare-key">URLクリック</span><span class="compare-val">${fmt(s.urlCl)}</span></div>
+    <div class="compare-row"><span class="compare-key">メディア再生</span><span class="compare-val">${fmt(s.media)}</span></div></div>`;
+  }).join('');
+  const allWK=[...new Set(ACCOUNTS.flatMap(a=>weeks(filt(month,a.name)).map(([k])=>k)))].sort();
+  const wl=allWK.map(k=>{const d=new Date(k);return`${d.getMonth()+1}/${d.getDate()}`});
+  dchart(['cmpImp','cmpEr','cmpLike']);
+  const mkDS=(key,p=false)=>ACCOUNTS.map(a=>{const m={};weeks(filt(month,a.name)).forEach(([k,w])=>{const s=stats(w.rows);m[k]=p?(s?.er||0):(s?.[key]||0);});return{label:a.name,data:allWK.map(k=>m[k]||0),borderColor:a.color,backgroundColor:a.color+'33',fill:false,tension:0.4,pointRadius:3,borderWidth:2};});
+  const mkL=id=>document.getElementById(id).innerHTML=ACCOUNTS.map(a=>`<span class="legend-item"><span class="legend-sq" style="background:${a.color}"></span>${a.name}</span>`).join('');
+  mkL('cmpImpLegend');mkL('cmpErLegend');mkL('cmpLikeLegend');
+  charts.cmpImp=new Chart(document.getElementById('cmpImpChart'),{type:'line',data:{labels:wl,datasets:mkDS('imp')},options:bOpts()});
+  charts.cmpEr=new Chart(document.getElementById('cmpErChart'),{type:'line',data:{labels:wl,datasets:mkDS('er',true)},options:bOpts()});
+  charts.cmpLike=new Chart(document.getElementById('cmpLikeChart'),{type:'line',data:{labels:wl,datasets:mkDS('likes')},options:bOpts()});
+  const metrics=[{l:'投稿数',k:'count'},{l:'IMP合計',k:'imp'},{l:'IMP平均',k:'avgImp'},{l:'エンゲージ計',k:'eng'},{l:'ER%',k:'er',p:true},{l:'RT計',k:'rt'},{l:'リプライ計',k:'reply'},{l:'いいね計',k:'likes'},{l:'プロフCL計',k:'prof'},{l:'URLクリック計',k:'urlCl'},{l:'詳細CL計',k:'detail'},{l:'メディア再生計',k:'media'}];
+  const sba=ACCOUNTS.map(a=>stats(filt(month,a.name)));
+  const thead=`<thead><tr><th class="left">指標</th>${ACCOUNTS.map(a=>`<th style="color:${a.color};text-align:right">${a.name}</th>`).join('')}</tr></thead>`;
+  const tbody=`<tbody>${metrics.map(m=>{const vals=sba.map(s=>s?.[m.k]??null);const maxV=Math.max(...vals.filter(v=>v!==null));return`<tr>${[`<td class="left" style="color:var(--text3)">${m.l}</td>`,...vals.map((v,i)=>{const isMax=v!==null&&v===maxV&&maxV>0;const disp=v===null?'-':m.p?fmtP(v):fmt(v);return`<td style="color:${isMax?ACCOUNTS[i].color:'var(--text)'};font-weight:${isMax?700:400}">${disp}</td>`;})].join('')}</tr>`;}).join('')}</tbody>`;
+  document.getElementById('cmpTable').innerHTML=thead+tbody;
+}
+
+function renderPosts(){
+  const q=(document.getElementById('searchInput')?.value||'').toLowerCase();
+  const acct=document.getElementById('filterAcct')?.value||'';
+  const dept=document.getElementById('filterDept')?.value||'';
+  const genre=document.getElementById('filterGenre')?.value||'';
+  const month=document.getElementById('filterMonth2')?.value||'';
+  let rows=allData;
+  if(q)rows=rows.filter(r=>(r.url||'').toLowerCase().includes(q)||(r.dept||'').toLowerCase().includes(q));
+  if(acct)rows=rows.filter(r=>r.account===acct);
+  if(dept)rows=rows.filter(r=>r.dept===dept);
+  if(genre)rows=rows.filter(r=>r.genre===genre);
+  if(month)rows=rows.filter(r=>r.date.startsWith(month));
+  rows=[...rows].sort((a,b)=>b.impressions-a.impressions);
+  document.getElementById('filterCount').textContent=rows.length+'件';
+  const html=rows.map(r=>{
+    const er=r.impressions>0?(r.engagements/r.impressions*100):0;
+    const ac=acctColor(r.account||'');const dc=deptColor(r.dept||'');
+    return`<tr><td class="left" style="font-family:var(--mono);font-size:10px">${r.date}</td><td class="left"><span class="badge" style="background:${ac}22;color:${ac}">${r.account||'-'}</span></td><td class="left"><span class="badge" style="background:${dc}22;color:${dc}">${r.dept||'未設定'}</span></td><td class="left"><span class="badge" style="background:rgba(255,255,255,.05);color:var(--text2)">${r.genre||'未設定'}</span></td><td class="url-cell left"><a href="${r.url}" target="_blank">${(r.url||'').replace(/https?:\/\/(twitter|x)\.com\//,'').substring(0,40)}</a></td><td>${fmt(r.impressions)}</td><td>${fmt(r.engagements)}</td><td class="${erc(er)}">${fmtP(er)}</td><td>${fmt(r.rt)}</td><td>${fmt(r.reply)}</td><td>${fmt(r.likes)}</td><td>${fmt(r.profile_click)}</td><td>${fmt(r.url_click)}</td><td>${fmt(r.detail_click)}</td><td>${fmt(r.media_play)}</td></tr>`;
+  }).join('');
+  document.getElementById('postBody').innerHTML=html||'<tr><td colspan="15" style="text-align:center;padding:28px;color:var(--text3)">データがありません</td></tr>';
+}
+
+function switchBreakTab(tab,el){currentBreakTab=tab;document.querySelectorAll('#page-breakdown .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderBreakdown();}
+function renderBreakdown(){
+  const month=document.getElementById('brkMonthSel')?.value||'all';
+  const acct=document.getElementById('brkAcctSel')?.value||'all';
+  const rows=filt(month,acct);
+  const keyFn={dept:r=>r.dept,genre:r=>r.genre}[currentBreakTab];
+  const groups={};rows.forEach(r=>{const k=keyFn(r)||'未設定';if(!groups[k])groups[k]=[];groups[k].push(r);});
+  const sorted=Object.entries(groups).sort((a,b)=>(stats(b[1])?.imp||0)-(stats(a[1])?.imp||0));
+  const maxI=Math.max(...sorted.map(([,rs])=>stats(rs)?.imp||0));
+  document.getElementById('breakdownContent').innerHTML=`<div class="breakdown-grid">${sorted.map(([key,rs],i)=>{
+    const s=stats(rs);if(!s)return'';
+    const color=currentBreakTab==='dept'?deptColor(key):PAL[i%PAL.length];const pct=maxI>0?(s.imp/maxI*100):0;
+    return`<div class="breakdown-card"><div class="breakdown-header"><div class="acct-dot" style="background:${color}"></div><div style="flex:1;font-size:13px;font-weight:700">${key}</div><div style="font-size:10px;color:var(--text3);font-family:var(--mono)">${s.count}件</div></div><div class="bar-wrap" style="margin:0 0 8px"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div><div class="breakdown-row"><span class="breakdown-key">インプレッション計</span><span class="breakdown-val">${fmt(s.imp)}</span></div><div class="breakdown-row"><span class="breakdown-key">ER%</span><span class="breakdown-val ${erc(s.er)}">${fmtP(s.er)}</span></div><div class="breakdown-row"><span class="breakdown-key">いいね計</span><span class="breakdown-val">${fmt(s.likes)}</span></div><div class="breakdown-row"><span class="breakdown-key">RT計</span><span class="breakdown-val">${fmt(s.rt)}</span></div><div class="breakdown-row"><span class="breakdown-key">URLクリック計</span><span class="breakdown-val">${fmt(s.urlCl)}</span></div><div class="breakdown-row"><span class="breakdown-key">メディア再生計</span><span class="breakdown-val">${fmt(s.media)}</span></div></div>`;
+  }).join('')}</div>`;
+}
+
+// X CSV Parser
+const XCOL={url:1,date:3,impressions:4,engagements:5,rt:7,reply:8,likes:9,profile_click:10,url_click:11,detail_click:13,media_play:20};
+function pn(v){const n=parseFloat((v||'').trim().replace(/,/g,''));return isNaN(n)?0:n;}
+function parseCSVFull(text){
+  const rows=[];let i=0,n=text.length;
+  while(i<n){
+    const row=[];
+    while(i<n){
+      if(text[i]==='"'){
+        i++;let val='';
+        while(i<n){if(text[i]==='"'){if(i+1<n&&text[i+1]==='"'){val+='"';i+=2;}else{i++;break;}}else{val+=text[i++];}}
+        row.push(val);
+        if(i<n&&text[i]===',')i++;
+        else if(i<n&&(text[i]==='\n'||text[i]==='\r')){if(text[i]==='\r'&&text[i+1]==='\n')i++;i++;break;}
+        else if(i>=n)break;
+      }else{
+        let val='';while(i<n&&text[i]!==','&&text[i]!=='\n'&&text[i]!=='\r')val+=text[i++];
+        row.push(val.trim());
+        if(i<n&&text[i]===',')i++;
+        else if(i<n&&(text[i]==='\n'||text[i]==='\r')){if(text[i]==='\r'&&text[i+1]==='\n')i++;i++;break;}
+        else if(i>=n)break;
+      }
+    }
+    if(row.length>1)rows.push(row);
+  }
+  return rows;
+}
+function parseXCsv(text,acct){
+  const rows=parseCSVFull(text);if(rows.length<2)return[];
+  const results=[];
+  for(let i=1;i<rows.length;i++){
+    const cols=rows[i];if(cols.length<5)continue;
+    const dateRaw=(cols[XCOL.date]||'').trim();if(!dateRaw||dateRaw==='-')continue;
+    results.push({account:acct,dept:'',genre:'',url:(cols[XCOL.url]||'').trim(),date:dateRaw.substring(0,16),
+      impressions:pn(cols[XCOL.impressions]),engagements:pn(cols[XCOL.engagements]),rt:pn(cols[XCOL.rt]),
+      reply:pn(cols[XCOL.reply]),likes:pn(cols[XCOL.likes]),profile_click:pn(cols[XCOL.profile_click]),
+      url_click:pn(cols[XCOL.url_click]),detail_click:pn(cols[XCOL.detail_click]),media_play:pn(cols[XCOL.media_play])});
+  }
+  return results;
+}
+function readAsText(file){
+  return new Promise((resolve,reject)=>{
+    const fr=new FileReader();
+    fr.onload=e=>{
+      try{const buf=e.target.result;const bytes=new Uint8Array(buf);
+        if(bytes[0]===0xEF&&bytes[1]===0xBB&&bytes[2]===0xBF){resolve(new TextDecoder('utf-8').decode(buf));return;}
+        let sjis=false;for(let j=0;j<Math.min(bytes.length,2000);j++){if((bytes[j]>=0x81&&bytes[j]<=0x9F)||(bytes[j]>=0xE0&&bytes[j]<=0xFC)){sjis=true;break;}}
+        resolve(new TextDecoder(sjis?'shift-jis':'utf-8').decode(buf));
+      }catch(err){reject(err);}
+    };
+    fr.onerror=reject;fr.readAsArrayBuffer(file);
+  });
+}
+async function handleXCsv(file){
+  if(!file)return;
+  const acct=(document.getElementById('impAcct')?.value||'').trim();
+  if(!acct){document.getElementById('importMsg').innerHTML='<span style="color:var(--red)">アカウントを選択してください</span>';return;}
+  document.getElementById('importMsg').innerHTML='<span style="color:var(--text2)">読み込み中...</span>';
+  try{
+    const text=await readAsText(file);const rows=parseXCsv(text,acct);
+    if(!rows.length){document.getElementById('importMsg').innerHTML='<span style="color:var(--red)">データが見つかりませんでした</span>';return;}
+    pendingRows=rows;showTagEditor(acct,rows);
+    document.getElementById('importMsg').innerHTML=`<span style="color:var(--green)">✓ ${rows.length}件読み込みました。部門・ジャンルを設定してください。</span>`;
+  }catch(err){document.getElementById('importMsg').innerHTML=`<span style="color:var(--red)">エラー: ${err.message}</span>`;}
+}
+
+// Tag Editor
+function showTagEditor(acct,rows){
+  syncSel();
+  document.getElementById('tagEditorSection').style.display='';
+  document.getElementById('tagEditorTitle').textContent=`${acct} — ${rows.length}件`;
+  const dOpts='<option value="">未設定</option>'+DEPTS.map(d=>`<option>${d}</option>`).join('');
+  const gOpts='<option value="">未設定</option>'+GENRES.map(g=>`<option>${g}</option>`).join('');
+  document.getElementById('tagEditorRows').innerHTML=rows.map((r,i)=>`
+    <div class="tag-row">
+      <div class="tag-cell" style="font-family:var(--mono);font-size:10px;color:var(--text3)">${r.date.substring(0,10)}</div>
+      <div class="tag-cell url-c" title="${r.url}">${r.url.replace(/https?:\/\/(twitter|x)\.com\//,'').substring(0,35)}</div>
+      <div class="tag-cell"><select id="td_${i}">${dOpts}</select></div>
+      <div class="tag-cell"><select id="tg_${i}">${gOpts}</select></div>
+      <div class="tag-cell tag-check"><input type="checkbox" id="tc_${i}" checked></div>
+    </div>`).join('');
+  document.getElementById('tagEditorSection').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function bulkSet(type){
+  const val=document.getElementById(type==='dept'?'bulkDept':'bulkGenre').value;if(!val)return;
+  pendingRows.forEach((_,i)=>{const cb=document.getElementById('tc_'+i);const sel=document.getElementById((type==='dept'?'td_':'tg_')+i);if(cb&&cb.checked&&sel)sel.value=val;});
+  document.getElementById(type==='dept'?'bulkDept':'bulkGenre').value='';
+}
+function checkAll(state){pendingRows.forEach((_,i)=>{const cb=document.getElementById('tc_'+i);if(cb)cb.checked=state;});}
+function commitTagged(){
+  pendingRows.forEach((r,i)=>{r.dept=document.getElementById('td_'+i)?.value||'';r.genre=document.getElementById('tg_'+i)?.value||'';});
+  const toAdd=[...pendingRows];
+  allData=[...allData,...toAdd];pendingRows=[];
+  document.getElementById('tagEditorSection').style.display='none';
+  syncSel();renderImpStats();
+  document.getElementById('importMsg').innerHTML=`<span style="color:var(--green)">✓ インポート完了（合計 ${allData.length}件）</span>`;
+  savePostsToSheet(toAdd);
+}
+function cancelTag(){pendingRows=[];document.getElementById('tagEditorSection').style.display='none';}
+
+function renderImpStats(){
+  const sec=document.getElementById('importedDataSection');if(!allData.length){sec.style.display='none';return;}
+  sec.style.display='';
+  renderGasStatus();
+  document.getElementById('importedStats').innerHTML=ACCOUNTS.map(a=>{
+    const cnt=allData.filter(r=>r.account===a.name).length;
+    const un=allData.filter(r=>r.account===a.name&&!r.dept).length;
+    return`<div class="kpi-card"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:${a.color}"></div><div class="kpi-label">${a.name}</div><div class="kpi-value sm">${cnt}件</div>${un?`<div class="kpi-sub" style="color:var(--yellow)">部門未設定 ${un}件</div>`:'<div class="kpi-sub up">設定完了</div>'}</div>`;
+  }).join('');
+}
+function clearAllData(){if(!confirm('全データを削除しますか？'))return;allData=[];followerLog={};syncSel();renderImpStats();document.getElementById('importMsg').innerHTML='';}
+function downloadCSV(){
+  if(!allData.length)return;
+  const h='account,dept,genre,url,date,impressions,engagements,er,rt,reply,likes,profile_click,url_click,detail_click,media_play\n';
+  const body=allData.map(r=>{const er=r.impressions>0?(r.engagements/r.impressions*100).toFixed(4):'0';return[r.account,r.dept,r.genre,r.url,r.date,r.impressions,r.engagements,er,r.rt,r.reply,r.likes,r.profile_click,r.url_click,r.detail_click,r.media_play].join(',');}).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+h+body],{type:'text/csv'}));a.download='sns_export.csv';a.click();
+}
+// ── API通信 ──────────────────────────────────────────────
+function isApiConfigured() {
+  return GAS_API_URL && GAS_API_URL !== 'YOUR_GAS_URL_HERE';
+}
+
+async function apiGet(action) {
+  const res = await fetch(`${GAS_API_URL}?action=${action}`);
+  return res.json();
+}
+
+async function apiPost(body) {
+  const res = await fetch(GAS_API_URL, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+// 起動時にスプレッドシートからデータを読み込む
+async function loadFromSheet() {
+  if (!isApiConfigured()) return;
+  showSyncStatus('読み込み中...', 'loading');
+  try {
+    const data = await apiGet('getAll');
+    if (data.error) throw new Error(data.error);
+    // 投稿データ
+    if (data.posts && data.posts.length) {
+      allData = data.posts.map(r => ({
+        account: r.account||'', dept: r.dept||'', genre: r.genre||'',
+        url: r.url||'', date: (r.date||'').substring(0,16),
+        impressions:+r.impressions||0, engagements:+r.engagements||0,
+        rt:+r.rt||0, reply:+r.reply||0, likes:+r.likes||0,
+        profile_click:+r.profile_click||0, url_click:+r.url_click||0,
+        detail_click:+r.detail_click||0, media_play:+r.media_play||0,
+      }));
+    }
+    // フォロワーデータ
+    if (data.followers && data.followers.length) {
+      followerLog = {};
+      data.followers.forEach(r => {
+        const acct = r.account;
+        if (!followerLog[acct]) followerLog[acct] = [];
+        followerLog[acct].push({ date: String(r.date).substring(0,10), count: +r.count||0 });
+      });
+    }
+    syncSel(); renderDash(); renderImpStats();
+    showSyncStatus(`✓ ${allData.length}件読み込み完了`, 'ok');
+  } catch(err) {
+    showSyncStatus('読み込みエラー: ' + err.message, 'error');
+  }
+}
+
+// CSVインポート後にスプレッドシートへ保存
+async function savePostsToSheet(rows) {
+  if (!isApiConfigured()) return;
+  showSyncStatus('保存中...', 'loading');
+  try {
+    const toSave = rows.map(r => ({
+      ...r,
+      er: r.impressions > 0 ? (r.engagements / r.impressions * 100) : 0
+    }));
+    const res = await apiPost({ action:'addPosts', rows: toSave });
+    if (res.error) throw new Error(res.error);
+    showSyncStatus(`✓ ${res.added}件保存（重複${res.skipped}件スキップ）`, 'ok');
+  } catch(err) {
+    showSyncStatus('保存エラー: ' + err.message, 'error');
+  }
+}
+
+// フォロワー記録をスプレッドシートへ保存
+async function saveFollowerToSheet(account, date, count) {
+  if (!isApiConfigured()) return;
+  try {
+    await apiPost({ action:'addFollower', account, date, count });
+  } catch(err) {
+    console.error('follower save error:', err);
+  }
+}
+
+function showSyncStatus(msg, type) {
+  const el = document.getElementById('syncStatus');
+  if (!el) return;
+  const colors = { loading:'#f5a623', ok:'#2dd4a0', error:'#f05252' };
+  el.textContent = msg;
+  el.style.color = colors[type] || '#8b8fa8';
+}
+
+function renderGasStatus(){
+  const el=document.getElementById('gasStatusBox');if(!el)return;
+  if(isApiConfigured()){
+    el.style.background='rgba(45,212,160,0.08)';el.style.border='1px solid rgba(45,212,160,0.3)';
+    el.innerHTML=`<span style="color:var(--green);font-weight:700">✓ スプレッドシート連携 有効</span><br><span style="color:var(--text3)">データは自動的にGoogleスプレッドシートに保存・同期されます。</span>`;
+  }else{
+    el.style.background='rgba(245,166,35,0.08)';el.style.border='1px solid rgba(245,166,35,0.3)';
+    el.innerHTML=`<span style="color:var(--yellow);font-weight:700">⚠ スプレッドシート未設定（ローカルモード）</span><br><span style="color:var(--text3)">GAS URLを設定するとデータがスプレッドシートに保存され、部署全員で共有できます。<br>HTMLファイルの先頭 <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">GAS_API_URL</code> にURLを貼り付けてください。</span>`;
+  }
+}
+
+function loadSample(){
+  const rows=[
+    {account:'DetonatioN',dept:'Fortnite',genre:'現地画像',url:'https://x.com/a/s/1',date:'2026-05-25 07:49',impressions:474346,engagements:59463,rt:271,reply:32,likes:3937,profile_click:1675,url_click:8,detail_click:163,media_play:47160},
+    {account:'DetonatioN',dept:'2XKO',genre:'イベント情報',url:'https://x.com/a/s/2',date:'2026-05-11 11:00',impressions:548489,engagements:27877,rt:239,reply:2,likes:599,profile_click:798,url_click:1,detail_click:219,media_play:23884},
+    {account:'DetonatioN',dept:'ストリーマー',genre:'チーム情報',url:'https://x.com/a/s/3',date:'2026-05-09 06:14',impressions:1013742,engagements:36673,rt:1497,reply:21,likes:6360,profile_click:5453,url_click:6169,detail_click:1100,media_play:5595},
+    {account:'DetonatioN',dept:'格ゲー',genre:'大会情報',url:'https://x.com/a/s/4',date:'2026-05-21 08:00',impressions:121542,engagements:7078,rt:554,reply:5,likes:4061,profile_click:701,url_click:3,detail_click:83,media_play:856},
+    {account:'DetonatioN',dept:'Fortnite',genre:'DFM CREW',url:'https://x.com/a/s/5',date:'2026-04-19 10:30',impressions:353378,engagements:15901,rt:247,reply:8,likes:1075,profile_click:1386,url_click:875,detail_click:203,media_play:10005},
+    {account:'VALORANT',dept:'VALORANT',genre:'大会情報',url:'https://x.com/b/s/1',date:'2026-05-10 14:00',impressions:780000,engagements:42000,rt:1200,reply:45,likes:9800,profile_click:4200,url_click:850,detail_click:1200,media_play:0},
+    {account:'VALORANT',dept:'VALORANT',genre:'選手情報',url:'https://x.com/b/s/2',date:'2026-05-17 10:30',impressions:520000,engagements:31500,rt:890,reply:28,likes:7200,profile_click:3100,url_click:620,detail_click:890,media_play:0},
+    {account:'VALORANT',dept:'VALORANT',genre:'大会情報',url:'https://x.com/b/s/3',date:'2026-04-12 18:30',impressions:290000,engagements:12400,rt:180,reply:6,likes:1650,profile_click:980,url_click:120,detail_click:210,media_play:9200},
+    {account:'第五人格',dept:'第五人格',genre:'大会情報',url:'https://x.com/c/s/1',date:'2026-05-08 20:00',impressions:920000,engagements:55000,rt:1600,reply:72,likes:13500,profile_click:6200,url_click:1100,detail_click:1800,media_play:32000},
+    {account:'第五人格',dept:'第五人格',genre:'現地画像',url:'https://x.com/c/s/2',date:'2026-05-29 20:00',impressions:1100000,engagements:68000,rt:2100,reply:95,likes:16000,profile_click:7500,url_click:1400,detail_click:2200,media_play:45000},
+    {account:'第五人格',dept:'第五人格',genre:'動画',url:'https://x.com/c/s/3',date:'2026-04-20 14:00',impressions:420000,engagements:18500,rt:320,reply:8,likes:2800,profile_click:1900,url_click:220,detail_click:350,media_play:8500},
+    {account:'esports',dept:'LoL',genre:'大会情報',url:'https://x.com/d/s/1',date:'2026-05-07 09:00',impressions:185000,engagements:8200,rt:95,reply:4,likes:1200,profile_click:850,url_click:380,detail_click:210,media_play:1200},
+    {account:'esports',dept:'スマブラ',genre:'イベント情報',url:'https://x.com/d/s/2',date:'2026-05-14 10:00',impressions:142000,engagements:7100,rt:72,reply:3,likes:980,profile_click:720,url_click:290,detail_click:180,media_play:800},
+    {account:'esports',dept:'格ゲー',genre:'大会情報',url:'https://x.com/d/s/3',date:'2026-04-28 11:00',impressions:175000,engagements:8900,rt:95,reply:3,likes:980,profile_click:620,url_click:45,detail_click:140,media_play:3800},
+  ];
+  allData=[...allData,...rows];
+  followerLog={'DetonatioN':[{date:'2026-04-07',count:142000},{date:'2026-04-14',count:143200},{date:'2026-04-21',count:144800},{date:'2026-04-28',count:146500},{date:'2026-05-05',count:148200},{date:'2026-05-12',count:150100},{date:'2026-05-19',count:152800},{date:'2026-05-26',count:155600},{date:'2026-06-02',count:158400}],'VALORANT':[{date:'2026-04-07',count:48000},{date:'2026-04-14',count:48600},{date:'2026-04-21',count:49200},{date:'2026-04-28',count:50100},{date:'2026-05-05',count:51000},{date:'2026-05-12',count:52400},{date:'2026-05-19',count:54200},{date:'2026-05-26',count:56800},{date:'2026-06-02',count:59200}],'第五人格':[{date:'2026-04-07',count:95000},{date:'2026-04-14',count:96500},{date:'2026-04-21',count:98200},{date:'2026-04-28',count:100400},{date:'2026-05-05',count:102800},{date:'2026-05-12',count:105600},{date:'2026-05-19',count:109200},{date:'2026-05-26',count:114500},{date:'2026-06-02',count:120800}],'esports':[{date:'2026-04-07',count:18200},{date:'2026-04-14',count:18450},{date:'2026-04-21',count:18700},{date:'2026-04-28',count:19050},{date:'2026-05-05',count:19300},{date:'2026-05-12',count:19600},{date:'2026-05-19',count:19950},{date:'2026-05-26',count:20350},{date:'2026-06-02',count:20800}]};
+  syncSel();renderImpStats();
+  document.getElementById('importMsg').innerHTML='<span style="color:var(--green)">サンプルデータを読み込みました</span>';
+  showPage('dash',document.querySelector('.nav-item'));
+}
+const dz=document.getElementById('xDropZone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.style.borderColor='var(--accent)';});
+dz.addEventListener('dragleave',()=>dz.style.borderColor='');
+dz.addEventListener('drop',e=>{e.preventDefault();dz.style.borderColor='';handleXCsv(e.dataTransfer.files[0]);});
+renderSidebar();
+renderDash();
+// GASが設定されていれば自動でデータ読み込み
+if(isApiConfigured()){loadFromSheet();}
+</script>
+</body>
+</html>
