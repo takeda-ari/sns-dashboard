@@ -780,36 +780,20 @@ function isApiConfigured() {
   return GAS_API_URL && GAS_API_URL !== 'YOUR_GAS_URL_HERE';
 }
 
-// JSONP方式でGASを呼び出す（CORSを回避）
-function jsonpCall(params) {
-  return new Promise((resolve, reject) => {
-    const cbName = 'cb_' + Date.now() + '_' + Math.floor(Math.random()*10000);
-    const script = document.createElement('script');
-    const timeout = setTimeout(() => {
-      cleanup();
-      reject(new Error('タイムアウト'));
-    }, 15000);
-    function cleanup() {
-      clearTimeout(timeout);
-      delete window[cbName];
-      if (script.parentNode) script.parentNode.removeChild(script);
-    }
-    window[cbName] = (data) => { cleanup(); resolve(data); };
-    const qs = Object.entries({...params, callback: cbName})
-      .map(([k,v]) => k + '=' + encodeURIComponent(typeof v === 'object' ? JSON.stringify(v) : v))
-      .join('&');
-    script.src = GAS_API_URL + '?' + qs;
-    script.onerror = () => { cleanup(); reject(new Error('通信エラー')); };
-    document.head.appendChild(script);
-  });
-}
-
+// GAS通信（fetchベース + フォールバック）
 async function apiGet(action) {
-  return await jsonpCall({ action });
+  const url = GAS_API_URL + '?action=' + action;
+  const res = await fetch(url, { redirect: 'follow' });
+  const text = await res.text();
+  return JSON.parse(text);
 }
 
 async function apiPost(body) {
-  return await jsonpCall({ method: 'POST', body });
+  // GASはGET経由でPOST操作を受け付ける
+  const url = GAS_API_URL + '?method=POST&body=' + encodeURIComponent(JSON.stringify(body));
+  const res = await fetch(url, { redirect: 'follow' });
+  const text = await res.text();
+  return JSON.parse(text);
 }
 
 // 起動時にスプレッドシートからデータを読み込む
