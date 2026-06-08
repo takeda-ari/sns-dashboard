@@ -153,6 +153,7 @@ input[type=file]{display:none}
     <div class="nav-item" onclick="showPage('compare',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>アカウント比較</div>
     <div class="nav-item" onclick="showPage('posts',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>投稿一覧</div>
     <div class="nav-item" onclick="showPage('breakdown',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>部門・ジャンル別</div>
+    <div class="nav-item" onclick="showPage('manual',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>手動入力</div>
     <div class="nav-item" onclick="showPage('import',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>CSVインポート</div>
   </nav>
   <div class="acct-section"><div class="nav-label">アカウント</div><div id="sidebarAccts"></div></div>
@@ -216,7 +217,7 @@ input[type=file]{display:none}
   </div>
   <div class="table-wrap"><div class="table-scroll" style="max-height:560px;overflow-y:auto"><table><thead><tr>
     <th class="left">日付</th><th class="left">アカウント</th><th class="left">部門</th><th class="left">ジャンル</th><th class="left">URL</th>
-    <th>IMP</th><th>エンゲージ</th><th>ER%</th><th>RT</th><th>リプライ</th><th>いいね</th><th>プロフCL</th><th>URL CL</th><th>詳細CL</th><th>メディア再生</th>
+    <th>IMP</th><th>エンゲージ</th><th>ER%</th><th>RT</th><th>リプライ</th><th>いいね</th><th>プロフCL</th><th>URL CL</th><th>詳細CL</th><th>メディア再生</th><th class="left">編集</th>
   </tr></thead><tbody id="postBody"></tbody></table></div></div>
 </div>
 
@@ -230,6 +231,64 @@ input[type=file]{display:none}
   <div class="tabs"><div class="tab active" onclick="switchBreakTab('dept',this)">部門別</div><div class="tab" onclick="switchBreakTab('genre',this)">ジャンル別</div></div>
   <div id="breakdownContent"></div>
 </div>
+
+<div id="page-manual" style="display:none">
+  <div class="page-header"><div class="page-title">手動入力</div></div>
+  <div class="table-wrap" style="max-width:640px;padding:22px">
+    <div style="margin-bottom:16px">
+      <div class="form-section-title" style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">基本情報</div>
+      <div class="form-grid" style="margin-bottom:10px">
+        <div>
+          <label class="form-label">アカウント（必須）</label>
+          <select class="form-input" id="mAcct">
+            <option value="">-- 選択 --</option>
+            <option>DetonatioN</option><option>VALORANT</option><option>第五人格</option><option>esports</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">投稿日時（必須）</label>
+          <input type="datetime-local" class="form-input" id="mDate">
+        </div>
+        <div>
+          <label class="form-label">部門</label>
+          <select class="form-input" id="mDept">
+            <option value="">未設定</option>
+            <option>LoL</option><option>VALORANT</option><option>Fortnite</option><option>スマブラ</option><option>格ゲー</option><option>シャドバ</option><option>ストリーマー</option><option>ポケモンユナイト</option><option>第五人格</option><option>2XKO</option><option>その他</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">ジャンル</label>
+          <select class="form-input" id="mGenre">
+            <option value="">未設定</option>
+            <option>チーム情報</option><option>大会情報</option><option>イベント情報</option><option>キャンペーン情報</option><option>スポンサー関連</option><option>DFM CREW</option><option>DFM PARK</option><option>日常</option><option>現地画像</option><option>動画</option><option>出演情報</option><option>その他</option><option>グッズ</option><option>はこおし</option><option>広報施策関連</option><option>外部案件</option>
+          </select>
+        </div>
+        <div style="grid-column:1/-1">
+          <label class="form-label">投稿URL</label>
+          <input type="url" class="form-input" id="mUrl" placeholder="https://x.com/...">
+        </div>
+      </div>
+      <div class="form-section-title" style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);margin-top:16px">数値データ</div>
+      <div class="form-grid">
+        <div><label class="form-label">インプレッション</label><input type="number" class="form-input" id="mImp" placeholder="0" min="0"></div>
+        <div><label class="form-label">エンゲージメント数</label><input type="number" class="form-input" id="mEng" placeholder="0" min="0"></div>
+        <div><label class="form-label">RT数</label><input type="number" class="form-input" id="mRt" placeholder="0" min="0"></div>
+        <div><label class="form-label">リプライ数</label><input type="number" class="form-input" id="mReply" placeholder="0" min="0"></div>
+        <div><label class="form-label">いいね数</label><input type="number" class="form-input" id="mLike" placeholder="0" min="0"></div>
+        <div><label class="form-label">プロフィールCL</label><input type="number" class="form-input" id="mProf" placeholder="0" min="0"></div>
+        <div><label class="form-label">URLクリック数</label><input type="number" class="form-input" id="mUrlCl" placeholder="0" min="0"></div>
+        <div><label class="form-label">詳細クリック</label><input type="number" class="form-input" id="mDetail" placeholder="0" min="0"></div>
+        <div><label class="form-label">メディア再生数</label><input type="number" class="form-input" id="mMedia" placeholder="0" min="0"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="ctrl-btn primary" onclick="submitManual()">追加する</button>
+      <button class="ctrl-btn" onclick="clearManual()">クリア</button>
+    </div>
+    <div id="manualMsg" style="margin-top:10px;font-size:12px;min-height:18px"></div>
+  </div>
+</div>
+
 
 <div id="page-import" style="display:none">
   <div class="page-header"><div class="page-title">CSVインポート</div>
@@ -314,7 +373,7 @@ input[type=file]{display:none}
 // ============================================================
 // GAS API URL — セットアップ後にここを書き換えてください
 // ============================================================
-const GAS_API_URL = 'YOUR_GAS_URL_HERE';
+const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbzMbB3ilecFDbBR7IyBy0ORBXzfsbtv7R3y8DxoL8yhYMtpdDbfbGR6l5O_uuX8zjVjmg/exec';
 // ============================================================
 
 const ACCOUNTS=[{name:'DetonatioN',color:'#4f7fff'},{name:'VALORANT',color:'#e879a0'},{name:'第五人格',color:'#2dd4a0'},{name:'esports',color:'#f5a623'}];
@@ -335,6 +394,7 @@ function showPage(name,el){
   document.getElementById('page-'+name).style.display='';
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(el)el.classList.add('active');
+  if(name==='manual'){renderManualPage();}  
   if(name==='dash')renderDash();
   if(name==='followers'){syncSel();renderFollowers();}
   if(name==='compare'){syncSel();renderCompare();}
@@ -560,10 +620,24 @@ function renderPosts(){
   if(month)rows=rows.filter(r=>r.date.startsWith(month));
   rows=[...rows].sort((a,b)=>b.impressions-a.impressions);
   document.getElementById('filterCount').textContent=rows.length+'件';
-  const html=rows.map(r=>{
+  const dOpts=DEPTS.map(d=>`<option>${d}</option>`).join('');
+  const gOpts=GENRES.map(g=>`<option>${g}</option>`).join('');
+  const html=rows.map((r,idx)=>{
     const er=r.impressions>0?(r.engagements/r.impressions*100):0;
     const ac=acctColor(r.account||'');const dc=deptColor(r.dept||'');
-    return`<tr><td class="left" style="font-family:var(--mono);font-size:10px">${r.date}</td><td class="left"><span class="badge" style="background:${ac}22;color:${ac}">${r.account||'-'}</span></td><td class="left"><span class="badge" style="background:${dc}22;color:${dc}">${r.dept||'未設定'}</span></td><td class="left"><span class="badge" style="background:rgba(255,255,255,.05);color:var(--text2)">${r.genre||'未設定'}</span></td><td class="url-cell left"><a href="${r.url}" target="_blank">${(r.url||'').replace(/https?:\/\/(twitter|x)\.com\//,'').substring(0,40)}</a></td><td>${fmt(r.impressions)}</td><td>${fmt(r.engagements)}</td><td class="${erc(er)}">${fmtP(er)}</td><td>${fmt(r.rt)}</td><td>${fmt(r.reply)}</td><td>${fmt(r.likes)}</td><td>${fmt(r.profile_click)}</td><td>${fmt(r.url_click)}</td><td>${fmt(r.detail_click)}</td><td>${fmt(r.media_play)}</td></tr>`;
+    const globalIdx=allData.indexOf(r);
+    return`<tr id="prow_${globalIdx}">
+      <td class="left" style="font-family:var(--mono);font-size:10px">${r.date}</td>
+      <td class="left"><span class="badge" style="background:${ac}22;color:${ac}">${r.account||'-'}</span></td>
+      <td class="left" id="pdept_${globalIdx}"><span class="badge" style="background:${dc}22;color:${dc};cursor:pointer" onclick="startEditTag(${globalIdx},'dept')">${r.dept||'未設定'} ✏</span></td>
+      <td class="left" id="pgenre_${globalIdx}"><span class="badge" style="background:rgba(255,255,255,.05);color:var(--text2);cursor:pointer" onclick="startEditTag(${globalIdx},'genre')">${r.genre||'未設定'} ✏</span></td>
+      <td class="url-cell left"><a href="${r.url}" target="_blank">${(r.url||'').replace(/https?:\/\/(twitter|x)\.com\//,'').substring(0,40)}</a></td>
+      <td>${fmt(r.impressions)}</td><td>${fmt(r.engagements)}</td>
+      <td class="${erc(er)}">${fmtP(er)}</td>
+      <td>${fmt(r.rt)}</td><td>${fmt(r.reply)}</td><td>${fmt(r.likes)}</td>
+      <td>${fmt(r.profile_click)}</td><td>${fmt(r.url_click)}</td><td>${fmt(r.detail_click)}</td><td>${fmt(r.media_play)}</td>
+      <td class="left"><button class="ctrl-btn" style="padding:3px 8px;font-size:10px" onclick="startEditRow(${globalIdx})">編集</button></td>
+    </tr>`;
   }).join('');
   document.getElementById('postBody').innerHTML=html||'<tr><td colspan="15" style="text-align:center;padding:28px;color:var(--text3)">データがありません</td></tr>';
 }
@@ -798,6 +872,84 @@ function renderGasStatus(){
     el.style.background='rgba(245,166,35,0.08)';el.style.border='1px solid rgba(245,166,35,0.3)';
     el.innerHTML=`<span style="color:var(--yellow);font-weight:700">⚠ スプレッドシート未設定（ローカルモード）</span><br><span style="color:var(--text3)">GAS URLを設定するとデータがスプレッドシートに保存され、部署全員で共有できます。<br>HTMLファイルの先頭 <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">GAS_API_URL</code> にURLを貼り付けてください。</span>`;
   }
+}
+
+// ── 手動入力 ─────────────────────────────────────────────
+function renderManualPage(){
+  // 今日の日時をデフォルト設定
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().substring(0,16);
+  const el = document.getElementById('mDate');
+  if(el && !el.value) el.value = local;
+}
+function n(id){return parseInt(document.getElementById(id)?.value)||0;}
+function g(id){return (document.getElementById(id)?.value||'').trim();}
+async function submitManual(){
+  const acct=g('mAcct'),date=g('mDate'),url=g('mUrl');
+  if(!acct||!date){document.getElementById('manualMsg').innerHTML='<span style="color:var(--red)">アカウントと日付は必須です</span>';return;}
+  const row={account:acct,dept:g('mDept'),genre:g('mGenre'),url,date,
+    impressions:n('mImp'),engagements:n('mEng'),rt:n('mRt'),reply:n('mReply'),likes:n('mLike'),
+    profile_click:n('mProf'),url_click:n('mUrlCl'),detail_click:n('mDetail'),media_play:n('mMedia')};
+  allData.push(row);
+  syncSel();renderImpStats();
+  document.getElementById('manualMsg').innerHTML='<span style="color:var(--green)">✓ 追加しました</span>';
+  savePostsToSheet([row]);
+  setTimeout(()=>document.getElementById('manualMsg').innerHTML='',3000);
+}
+function clearManual(){
+  ['mAcct','mDept','mGenre','mUrl','mDate','mImp','mEng','mRt','mReply','mLike','mProf','mUrlCl','mDetail','mMedia']
+    .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+}
+
+// ── 投稿一覧 インライン編集 ───────────────────────────────
+function startEditTag(idx, field){
+  const isDepat = field==='dept';
+  const opts = isDepat ? DEPTS : GENRES;
+  const cellId = isDepat ? `pdept_${idx}` : `pgenre_${idx}`;
+  const cell = document.getElementById(cellId);
+  if(!cell) return;
+  const cur = allData[idx]?.[field]||'';
+  const selOpts = ['<option value="">未設定</option>',...opts.map(o=>`<option${o===cur?' selected':''}>${o}</option>`)].join('');
+  cell.innerHTML=`<select style="padding:3px 6px;border:1px solid var(--accent);border-radius:4px;background:var(--surface2);color:var(--text);font-size:11px;font-family:var(--sans);outline:none" onchange="saveTagEdit(${idx},'${field}',this.value)" onblur="cancelTagEdit(${idx},'${field}',this.value)">${selOpts}</select>`;
+  cell.querySelector('select').focus();
+}
+function saveTagEdit(idx, field, val){
+  if(!allData[idx]) return;
+  allData[idx][field]=val;
+  // スプレッドシートにも反映（投稿を再保存）
+  if(isApiConfigured()) savePostsToSheet([allData[idx]]);
+  renderPosts();
+}
+function cancelTagEdit(idx, field, val){
+  saveTagEdit(idx, field, val);
+}
+
+function startEditRow(idx){
+  const r=allData[idx];if(!r)return;
+  const dOpts=DEPTS.map(d=>`<option${d===r.dept?' selected':''}>${d}</option>`).join('');
+  const gOpts=GENRES.map(g=>`<option${g===r.genre?' selected':''}>${g}</option>`).join('');
+  const row=document.getElementById('prow_'+idx);if(!row)return;
+  row.innerHTML=`
+    <td class="left" style="font-family:var(--mono);font-size:10px">${r.date}</td>
+    <td class="left"><span class="badge" style="background:${acctColor(r.account||'')}22;color:${acctColor(r.account||'')}">${r.account||'-'}</span></td>
+    <td class="left"><select id="edit_dept_${idx}" style="width:100%;padding:4px 6px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:var(--text);font-size:11px"><option value="">未設定</option>${dOpts}</select></td>
+    <td class="left"><select id="edit_genre_${idx}" style="width:100%;padding:4px 6px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:var(--text);font-size:11px"><option value="">未設定</option>${gOpts}</select></td>
+    <td class="url-cell left"><a href="${r.url}" target="_blank">${(r.url||'').replace(/https?:\/\/(twitter|x)\.com\//,'').substring(0,40)}</a></td>
+    <td>${fmt(r.impressions)}</td><td>${fmt(r.engagements)}</td>
+    <td class="${erc(r.impressions>0?(r.engagements/r.impressions*100):0)}">${fmtP(r.impressions>0?(r.engagements/r.impressions*100):0)}</td>
+    <td>${fmt(r.rt)}</td><td>${fmt(r.reply)}</td><td>${fmt(r.likes)}</td>
+    <td>${fmt(r.profile_click)}</td><td>${fmt(r.url_click)}</td><td>${fmt(r.detail_click)}</td><td>${fmt(r.media_play)}</td>
+    <td class="left" style="display:flex;gap:4px;align-items:center">
+      <button class="ctrl-btn primary" style="padding:3px 8px;font-size:10px" onclick="saveEditRow(${idx})">保存</button>
+      <button class="ctrl-btn" style="padding:3px 8px;font-size:10px" onclick="renderPosts()">取消</button>
+    </td>`;
+}
+function saveEditRow(idx){
+  if(!allData[idx])return;
+  allData[idx].dept=document.getElementById('edit_dept_'+idx)?.value||'';
+  allData[idx].genre=document.getElementById('edit_genre_'+idx)?.value||'';
+  if(isApiConfigured()) savePostsToSheet([allData[idx]]);
+  renderPosts();
 }
 
 function loadSample(){
