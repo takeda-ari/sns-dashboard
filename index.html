@@ -703,24 +703,41 @@ function readAsText(file){
     const fr=new FileReader();
     fr.onload=e=>{
       try{
-        const buf=e.target.result;const bytes=new Uint8Array(buf);
-        // UTF-8 BOMチェック
+        const buf=e.target.result;
+        const bytes=new Uint8Array(buf);
+
+        // ① UTF-8 BOM (EF BB BF) チェック
         if(bytes[0]===0xEF&&bytes[1]===0xBB&&bytes[2]===0xBF){
           resolve(new TextDecoder('utf-8').decode(buf));return;
         }
-        // UTF-8で試みる
+
+        // ② Shift-JIS / cp932 バイト判定
+        // 0x81-0x9F または 0xE0-0xFC が含まれていたらShift-JIS
+        let hasSJIS=false;
+        for(let j=0;j<Math.min(bytes.length,4000);j++){
+          if((bytes[j]>=0x81&&bytes[j]<=0x9F)||(bytes[j]>=0xE0&&bytes[j]<=0xFC)){
+            hasSJIS=true;break;
+          }
+        }
+
+        if(hasSJIS){
+          // Shift-JIS (cp932) として読む
+          try{
+            const t=new TextDecoder('shift-jis').decode(buf);
+            resolve(t);return;
+          }catch(e2){
+            resolve(new TextDecoder('shift-jis',{fatal:false}).decode(buf));return;
+          }
+        }
+
+        // ③ UTF-8（BOMなし）として読む
         try{
           const t=new TextDecoder('utf-8',{fatal:true}).decode(buf);
           resolve(t);return;
-        }catch(e2){}
-        // cp932（Windows Shift-JIS）で試みる
-        try{
-          const t=new TextDecoder('shift-jis').decode(buf);
-          // 文字化けチェック：置換文字が多すぎないか確認
-          if((t.match(/�/g)||[]).length < 10){resolve(t);return;}
         }catch(e3){}
-        // 最終フォールバック
-        resolve(new TextDecoder('shift-jis',{fatal:false}).decode(buf));
+
+        // ④ 最終フォールバック
+        resolve(new TextDecoder('utf-8',{fatal:false}).decode(buf));
       }catch(err){reject(err);}
     };
     fr.onerror=reject;fr.readAsArrayBuffer(file);
