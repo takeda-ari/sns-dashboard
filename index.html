@@ -701,14 +701,15 @@ function renderPosts(){
   if(genre)rows=rows.filter(r=>r.genre===genre);
   if(month)rows=rows.filter(r=>r.date.startsWith(month));
   const sortOrd=document.getElementById('sortOrder')?.value||'date_desc';
+  const toMs=d=>{const t=Date.parse(d);return isNaN(t)?0:t;};
   rows=[...rows].sort((a,b)=>{
-    if(sortOrd==='date_desc')return b.date.localeCompare(a.date);
-    if(sortOrd==='date_asc')return a.date.localeCompare(b.date);
+    if(sortOrd==='date_desc')return toMs(b.date)-toMs(a.date);
+    if(sortOrd==='date_asc')return toMs(a.date)-toMs(b.date);
     if(sortOrd==='imp_desc')return b.impressions-a.impressions;
     if(sortOrd==='imp_asc')return a.impressions-b.impressions;
     if(sortOrd==='er_desc'){const ea=a.impressions>0?a.engagements/a.impressions:0;const eb=b.impressions>0?b.engagements/b.impressions:0;return eb-ea;}
     if(sortOrd==='likes_desc')return b.likes-a.likes;
-    return b.date.localeCompare(a.date);
+    return toMs(b.date)-toMs(a.date);
   });
   document.getElementById('filterCount').textContent=rows.length+'件';
   const dOpts=DEPTS.map(d=>`<option>${d}</option>`).join('');
