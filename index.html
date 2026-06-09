@@ -891,17 +891,18 @@ function isApiConfigured() {
 }
 
 async function apiGet(action) {
-  const res = await fetch(`${GAS_API_URL}?action=${action}`);
-  return res.json();
+  const url = GAS_API_URL + '?action=' + action;
+  const res = await fetch(url, { redirect: 'follow' });
+  const text = await res.text();
+  return JSON.parse(text);
 }
 
 async function apiPost(body) {
-  const res = await fetch(GAS_API_URL, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify(body)
-  });
-  return res.json();
+  // GASはGET経由でPOST操作を受け付ける
+  const url = GAS_API_URL + '?method=POST&body=' + encodeURIComponent(JSON.stringify(body));
+  const res = await fetch(url, { redirect: 'follow' });
+  const text = await res.text();
+  return JSON.parse(text);
 }
 
 // 起動時にスプレッドシートからデータを読み込む
