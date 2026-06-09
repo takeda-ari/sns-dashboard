@@ -215,6 +215,14 @@ input[type=file]{display:none}
     <select class="filter-sel" id="filterDept" onchange="renderPosts()"><option value="">全部門</option></select>
     <select class="filter-sel" id="filterGenre" onchange="renderPosts()"><option value="">全ジャンル</option></select>
     <select class="filter-sel" id="filterMonth2" onchange="renderPosts()"><option value="">全期間</option></select>
+    <select class="filter-sel" id="sortOrder" onchange="renderPosts()">
+      <option value="date_desc">日付（新しい順）</option>
+      <option value="date_asc">日付（古い順）</option>
+      <option value="imp_desc">IMP（高い順）</option>
+      <option value="imp_asc">IMP（低い順）</option>
+      <option value="er_desc">ER（高い順）</option>
+      <option value="likes_desc">いいね（多い順）</option>
+    </select>
     <span class="filter-count" id="filterCount"></span>
   </div>
   <div class="table-wrap"><div class="table-scroll" style="max-height:560px;overflow-y:auto"><table><thead><tr>
@@ -692,7 +700,16 @@ function renderPosts(){
   if(dept)rows=rows.filter(r=>r.dept===dept);
   if(genre)rows=rows.filter(r=>r.genre===genre);
   if(month)rows=rows.filter(r=>r.date.startsWith(month));
-  rows=[...rows].sort((a,b)=>b.impressions-a.impressions);
+  const sortOrd=document.getElementById('sortOrder')?.value||'date_desc';
+  rows=[...rows].sort((a,b)=>{
+    if(sortOrd==='date_desc')return b.date.localeCompare(a.date);
+    if(sortOrd==='date_asc')return a.date.localeCompare(b.date);
+    if(sortOrd==='imp_desc')return b.impressions-a.impressions;
+    if(sortOrd==='imp_asc')return a.impressions-b.impressions;
+    if(sortOrd==='er_desc'){const ea=a.impressions>0?a.engagements/a.impressions:0;const eb=b.impressions>0?b.engagements/b.impressions:0;return eb-ea;}
+    if(sortOrd==='likes_desc')return b.likes-a.likes;
+    return b.date.localeCompare(a.date);
+  });
   document.getElementById('filterCount').textContent=rows.length+'件';
   const dOpts=DEPTS.map(d=>`<option>${d}</option>`).join('');
   const gOpts=GENRES.map(g=>`<option>${g}</option>`).join('');
