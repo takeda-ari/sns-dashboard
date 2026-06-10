@@ -812,15 +812,15 @@ function renderBest(){
   };
   const topOverall=[...rows].sort((a,b)=>composite(b)-composite(a)).slice(0,TOP);
   const overallHtml=`<div style="background:var(--surface);border:2px solid var(--accent);border-radius:12px;overflow:hidden;margin-bottom:16px">
-    <div style="padding:12px 18px;background:linear-gradient(135deg,var(--accent)15%,transparent);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+    <div style="padding:12px 18px;background:rgba(56,102,245,0.06);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
       <span style="font-size:20px">🏆</span>
-      <span style="font-size:13px;font-weight:800;color:var(--accent)">総合評価 TOP${TOP}</span>
-      <span style="font-size:10px;color:var(--text3);margin-left:4px">IMP・ER・いいね を正規化して総合スコア算出</span>
+      <span style="font-size:13px;font-weight:800;color:var(--text)">総合評価 TOP${TOP}</span>
+      <span style="font-size:10px;color:var(--text2);margin-left:4px">IMP・ER・いいね を正規化して総合スコア算出</span>
     </div>
     <div style="display:grid;grid-template-columns:repeat(${Math.min(topOverall.length,5)},1fr)">
     `+topOverall.map((r,i)=>{
       const sc=composite(r);const ac=acctColor(r.account);const dc=deptColor(r.dept);
-      const rankColor=i===0?'#F59E0B':i===1?'#9CA3AF':i===2?'#CD7C54':'var(--text3)';
+      const rankColor=i===0?'#D97706':i===1?'#6B7280':i===2?'#92400E':'var(--text2)';
       const medals=['🥇','🥈','🥉','4️⃣','5️⃣'];
       return`<div style="padding:14px 16px;${i<topOverall.length-1?'border-right:1px solid var(--border)':''}">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
@@ -860,7 +860,7 @@ function renderBest(){
         sorted.map((r,i)=>{
           const v=m.fn(r);const pct=Math.round(v/maxV*100);
           const ac=acctColor(r.account);const dc=deptColor(r.dept);
-          const rankColor=i===0?'#F59E0B':i===1?'#9CA3AF':i===2?'#CD7C54':'var(--text3)';
+          const rankColor=i===0?'#D97706':i===1?'#6B7280':i===2?'#92400E':'var(--text2)';
           return`<div style="padding:8px 16px;border-bottom:1px solid var(--border)">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
               <span style="font-size:13px;font-weight:800;color:${rankColor};width:18px">#${i+1}</span>
