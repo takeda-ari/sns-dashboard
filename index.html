@@ -450,8 +450,9 @@ function renderDashTabs(){
 function selAcct(n){currentDashAcct=n;renderSidebar();renderDashTabs();renderDash();}
 function syncSel(){
   const viewMode=document.getElementById('dashViewSel')?.value||'week';
-  const months=[...new Set(allData.map(d=>d.date.substring(0,7)))].sort().reverse();
-  const years=[...new Set(allData.map(d=>d.date.substring(0,4)))].sort().reverse();
+  const getYM=d=>{const p=String(d).match(/(\d{4})[\/\-](\d{1,2})/);return p?`${p[1]}-${String(+p[2]).padStart(2,'0')}`:''};
+  const months=[...new Set(allData.map(d=>getYM(d.date)).filter(Boolean))].sort().reverse();
+  const years=[...new Set(allData.map(d=>{const p=String(d.date).match(/(\d{4})/);return p?p[1]:'';}).filter(Boolean))].sort().reverse();
   const dashOpts=viewMode==='month'?years:months;
   const an=ACCOUNTS.map(a=>a.name);
   [{id:'monthSel',ao:'<option value="all">全期間</option>',opts:dashOpts},{id:'cmpMonthSel',ao:'<option value="all">全期間</option>',opts:months},{id:'filterMonth2',ao:'<option value="">全期間</option>',opts:months},{id:'brkMonthSel',ao:'<option value="all">全期間</option>',opts:months}].forEach(c=>{
@@ -483,12 +484,14 @@ function stats(rows){
   return{count:rows.length,imp,eng,er:imp>0?(eng/imp*100):0,rt:sum('rt'),reply:sum('reply'),likes:sum('likes'),prof:sum('profile_click'),urlCl:sum('url_click'),detail:sum('detail_click'),media:sum('media_play'),avgImp:imp/rows.length,avgEng:eng/rows.length,medImp:med(rows.map(r=>r.impressions))};
 }
 function med(arr){const s=[...arr].sort((a,b)=>a-b);const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2;}
+function parseLocalDate(s){const p=String(s).match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);return p?new Date(+p[1],+p[2]-1,+p[3]):null;}
 function weeks(rows){
   const wk={};
   rows.forEach(r=>{
-    const dt=new Date(r.date.substring(0,10));const day=dt.getDay();
-    const mon=new Date(dt);mon.setDate(dt.getDate()-(day===0?6:day-1));
-    const key=mon.toISOString().substring(0,10);
+    const dt=parseLocalDate(r.date);if(!dt)return;
+    const day=dt.getDay();
+    const mon=new Date(dt.getFullYear(),dt.getMonth(),dt.getDate()-(day===0?6:day-1));
+    const key=`${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,'0')}-${String(mon.getDate()).padStart(2,'0')}`;
     if(!wk[key])wk[key]={start:new Date(mon),end:new Date(mon.getFullYear(),mon.getMonth(),mon.getDate()+6),rows:[]};
     wk[key].rows.push(r);
   });
@@ -496,7 +499,11 @@ function weeks(rows){
 }
 function mons(rows){
   const mo={};
-  rows.forEach(r=>{const key=r.date.substring(0,7);if(!mo[key])mo[key]={rows:[]};mo[key].rows.push(r);});
+  rows.forEach(r=>{
+    const p=String(r.date).match(/(\d{4})[\/\-](\d{1,2})/);
+    if(!p)return;const key=`${p[1]}-${String(+p[2]).padStart(2,'0')}`;
+    if(!mo[key])mo[key]={rows:[]};mo[key].rows.push(r);
+  });
   return Object.entries(mo).sort((a,b)=>a[0].localeCompare(b[0]));
 }
 function dchart(keys){(keys||Object.keys(charts)).forEach(k=>{if(charts[k]){try{charts[k].destroy()}catch(e){}delete charts[k];}});}
@@ -579,7 +586,7 @@ function renderMonthTable(rows){
 }
 function renderDashChartsCompare(month){
   const allWK=[...new Set(ACCOUNTS.flatMap(a=>weeks(filt(month,a.name)).map(([k])=>k)))].sort();
-  const labels=allWK.map(k=>{const d=new Date(k);return`${d.getMonth()+1}/${d.getDate()}`;});
+  const labels=allWK.map((k,i)=>{const m=+k.substring(5,7);return(i===0||+allWK[i-1].substring(5,7)!==m)?`${m}月`:'';});
   const mkDS=(key,pct=false)=>ACCOUNTS.map(a=>{
     const m={};weeks(filt(month,a.name)).forEach(([k,w])=>{const s=stats(w.rows);m[k]=pct?(s?.er||0):(s?.[key]||0);});
     return{label:a.name,data:allWK.map(k=>m[k]||0),borderColor:a.color,backgroundColor:a.color+'22',fill:false,tension:0.4,pointRadius:2,borderWidth:2};
@@ -610,7 +617,7 @@ function renderDashCharts(rows){
     renderDashChartsCompare(month);
     return;
   }
-  const wk=weeks(rows);const labels=wk.map(([,w])=>`${w.start.getMonth()+1}/${w.start.getDate()}`);
+  const wk=weeks(rows);const labels=wk.map(([,w],i)=>{const m=w.start.getMonth()+1;return(i===0||wk[i-1][1].start.getMonth()+1!==m)?`${m}月`:'';});
   const get=k=>wk.map(([,w])=>stats(w.rows)?.[k]||0);
   const color=acctColor(currentDashAcct);
   charts.imp=new Chart(document.getElementById('impChart'),{type:'bar',data:{labels,datasets:[{data:get('imp'),backgroundColor:color+'55',borderColor:color,borderWidth:1.5,borderRadius:3}]},options:bOpts()});
@@ -628,7 +635,7 @@ function renderDashCharts(rows){
 
 function renderDashChartsCompareMonthly(period){
   const allMO=[...new Set(ACCOUNTS.flatMap(a=>mons(filt(period,a.name)).map(([k])=>k)))].sort();
-  const labels=allMO.map(k=>k.replace(/^(\d{4})-(\d{2})$/,'$1/$2'));
+  const labels=allMO.map(k=>`${+k.substring(5,7)}月`);
   const mkDS=(key,pct=false)=>ACCOUNTS.map(a=>{const m={};mons(filt(period,a.name)).forEach(([k,mo])=>{const s=stats(mo.rows);m[k]=pct?(s?.er||0):(s?.[key]||0);});return{label:a.name,data:allMO.map(k=>m[k]||0),borderColor:a.color,backgroundColor:a.color+'33',fill:false,tension:0.4,pointRadius:3,borderWidth:2};});
   const mkLeg=id=>document.getElementById(id).innerHTML=ACCOUNTS.map(a=>`<span class="legend-item"><span class="legend-sq" style="background:${a.color}"></span>${a.name}</span>`).join('');
   charts.imp=new Chart(document.getElementById('impChart'),{type:'line',data:{labels,datasets:mkDS('imp')},options:bOpts()});
@@ -644,7 +651,7 @@ function renderDashChartsCompareMonthly(period){
 function renderDashChartsMonthly(rows){
   dchart(['imp','er','reaction','dept','click']);
   if(currentDashAcct==='all'){const period=document.getElementById('monthSel')?.value||'all';renderDashChartsCompareMonthly(period);return;}
-  const mo=mons(rows);const labels=mo.map(([k])=>k.replace(/^(\d{4})-(\d{2})$/,'$1/$2'));
+  const mo=mons(rows);const labels=mo.map(([k])=>`${+k.substring(5,7)}月`);
   const get=k=>mo.map(([,m])=>stats(m.rows)?.[k]||0);
   const color=acctColor(currentDashAcct);
   charts.imp=new Chart(document.getElementById('impChart'),{type:'bar',data:{labels,datasets:[{data:get('imp'),backgroundColor:color+'55',borderColor:color,borderWidth:1.5,borderRadius:4}]},options:bOpts()});
@@ -811,7 +818,7 @@ function renderCompare(){
     <div class="compare-row"><span class="compare-key">メディア再生</span><span class="compare-val">${fmt(s.media)}</span></div></div>`;
   }).join('');
   const allWK=[...new Set(ACCOUNTS.flatMap(a=>weeks(filt(month,a.name)).map(([k])=>k)))].sort();
-  const wl=allWK.map(k=>{const d=new Date(k);return`${d.getMonth()+1}/${d.getDate()}`});
+  const wl=allWK.map((k,i)=>{const m=+k.substring(5,7);return(i===0||+allWK[i-1].substring(5,7)!==m)?`${m}月`:'';});
   dchart(['cmpImp','cmpEr','cmpLike']);
   const mkDS=(key,p=false)=>ACCOUNTS.map(a=>{const m={};weeks(filt(month,a.name)).forEach(([k,w])=>{const s=stats(w.rows);m[k]=p?(s?.er||0):(s?.[key]||0);});return{label:a.name,data:allWK.map(k=>m[k]||0),borderColor:a.color,backgroundColor:a.color+'33',fill:false,tension:0.4,pointRadius:3,borderWidth:2};});
   const mkL=id=>document.getElementById(id).innerHTML=ACCOUNTS.map(a=>`<span class="legend-item"><span class="legend-sq" style="background:${a.color}"></span>${a.name}</span>`).join('');
@@ -912,8 +919,8 @@ function syncBestPeriod(){
       const y=mon.getFullYear(),m=String(mon.getMonth()+1).padStart(2,'0'),dd=String(mon.getDate()).padStart(2,'0');
       wks.add(`${y}-${m}-${dd}`);});
     opts=[...wks].sort().reverse();
-    const endStr=w=>{const d=new Date(w);d.setDate(d.getDate()+6);return`${d.getMonth()+1}/${d.getDate()}`;};
-    sel.innerHTML=opts.map(w=>{const d=new Date(w);return`<option value="${w}">${d.getMonth()+1}/${d.getDate()}〜${endStr(w)}</option>`;}).join('');
+    const endStr=w=>{const p=w.match(/(\d{4})-(\d{2})-(\d{2})/);if(!p)return w;const d=new Date(+p[1],+p[2]-1,+p[3]+6);return`${d.getMonth()+1}/${d.getDate()}`;};
+    sel.innerHTML=opts.map(w=>{const p=w.match(/(\d{4})-(\d{2})-(\d{2})/);if(!p)return'';const d=new Date(+p[1],+p[2]-1,+p[3]);return`<option value="${w}">${d.getMonth()+1}/${d.getDate()}〜${endStr(w)}</option>`;}).join('');
   }
   if(opts.includes(cur))sel.value=cur;
 }
