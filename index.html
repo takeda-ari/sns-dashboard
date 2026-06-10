@@ -154,6 +154,7 @@ input[type=file]{display:none}
     <div class="nav-item" onclick="showPage('followers',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>フォロワー管理</div>
     <div class="nav-item" onclick="showPage('compare',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>アカウント比較</div>
     <div class="nav-item" onclick="showPage('posts',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>投稿一覧</div>
+    <div class="nav-item" onclick="showPage('best',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>注目投稿</div>
     <div class="nav-item" onclick="showPage('breakdown',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>部門・ジャンル別</div>
     <div class="nav-item" onclick="showPage('manual',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>手動入力</div>
     <div class="nav-item" onclick="showPage('import',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>CSVインポート</div>
@@ -229,6 +230,21 @@ input[type=file]{display:none}
     <th class="left">日付</th><th class="left">アカウント</th><th class="left">部門</th><th class="left">ジャンル</th><th class="left">URL</th>
     <th>IMP</th><th>エンゲージ</th><th>ER%</th><th>RT</th><th>リプライ</th><th>いいね</th><th>プロフCL</th><th>URL CL</th><th>詳細CL</th><th>メディア再生</th><th class="left">編集</th>
   </tr></thead><tbody id="postBody"></tbody></table></div></div>
+</div>
+
+<div id="page-best" style="display:none">
+  <div class="page-header">
+    <div class="page-title">注目投稿</div>
+    <div class="header-controls">
+      <select class="ctrl-btn" id="bestAcct" onchange="renderBest()"><option value="">全アカウント</option></select>
+      <select class="ctrl-btn" id="bestPeriodType" onchange="syncBestPeriod();renderBest()">
+        <option value="month">月別</option>
+        <option value="week">週別</option>
+      </select>
+      <select class="ctrl-btn" id="bestPeriod" onchange="renderBest()"></select>
+    </div>
+  </div>
+  <div id="bestContent"></div>
 </div>
 
 <div id="page-breakdown" style="display:none">
@@ -417,6 +433,7 @@ function showPage(name,el){
   if(name==='compare'){syncSel();renderCompare();}
   if(name==='posts'){syncSel();renderPosts();}
   if(name==='breakdown'){syncSel();renderBreakdown();}
+  if(name==='best'){syncBestSel();renderBest();}
   if(name==='import')renderImpStats();
 }
 function renderSidebar(){
@@ -738,6 +755,92 @@ function renderPosts(){
 }
 
 function switchBreakTab(tab,el){currentBreakTab=tab;document.querySelectorAll('#page-breakdown .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderBreakdown();}
+function syncBestSel(){
+  const ba=document.getElementById('bestAcct');if(!ba)return;
+  const cur=ba.value;
+  ba.innerHTML='<option value="">全アカウント</option>'+ACCOUNTS.map(a=>`<option value="${a.name}">${a.name}</option>`).join('');
+  if(cur)ba.value=cur;
+  syncBestPeriod();
+}
+function syncBestPeriod(){
+  const type=document.getElementById('bestPeriodType')?.value||'month';
+  const acct=document.getElementById('bestAcct')?.value||'';
+  const rows=acct?allData.filter(r=>r.account===acct):allData;
+  const sel=document.getElementById('bestPeriod');if(!sel)return;
+  const cur=sel.value;
+  let opts=[];
+  if(type==='month'){
+    opts=[...new Set(rows.map(r=>r.date.substring(0,7)))].filter(Boolean).sort().reverse();
+    sel.innerHTML=opts.map(m=>`<option value="${m}">${m}</option>`).join('');
+  }else{
+    // 週: 月曜始まりでYYYY-MM-DD形式のキー
+    const wks=new Set();
+    rows.forEach(r=>{
+      const d=new Date(r.date.substring(0,10));if(isNaN(d))return;
+      const day=d.getDay();const mon=new Date(d);mon.setDate(d.getDate()-(day===0?6:day-1));
+      const y=mon.getFullYear(),m=String(mon.getMonth()+1).padStart(2,'0'),dd=String(mon.getDate()).padStart(2,'0');
+      wks.add(`${y}-${m}-${dd}`);
+    });
+    opts=[...wks].sort().reverse();
+    const end=w=>{const d=new Date(w);d.setDate(d.getDate()+6);return`${d.getMonth()+1}/${d.getDate()}`;};
+    sel.innerHTML=opts.map(w=>{const d=new Date(w);return`<option value="${w}">${d.getMonth()+1}/${d.getDate()}〜${end(w)}</option>`;}).join('');
+  }
+  if(opts.includes(cur))sel.value=cur;
+}
+function renderBest(){
+  const el=document.getElementById('bestContent');if(!el)return;
+  const acct=document.getElementById('bestAcct')?.value||'';
+  const type=document.getElementById('bestPeriodType')?.value||'month';
+  const period=document.getElementById('bestPeriod')?.value||'';
+  if(!period){el.innerHTML='<p style="color:var(--text3);padding:24px">データがありません</p>';return;}
+  let rows=acct?allData.filter(r=>r.account===acct):allData;
+  if(type==='month'){
+    rows=rows.filter(r=>r.date.startsWith(period));
+  }else{
+    const monD=new Date(period);const sunD=new Date(period);sunD.setDate(sunD.getDate()+6);
+    rows=rows.filter(r=>{const d=new Date(r.date.substring(0,10));return d>=monD&&d<=sunD;});
+  }
+  if(!rows.length){el.innerHTML='<p style="color:var(--text3);padding:24px">該当期間のデータがありません</p>';return;}
+  const TOP=5;
+  const metrics=[
+    {key:'imp',label:'インプレッション TOP5',icon:'👁',fn:r=>r.impressions,fmt:fmt,color:'var(--accent)'},
+    {key:'er', label:'エンゲージメント率 TOP5',icon:'💫',fn:r=>r.impressions>0?r.engagements/r.impressions*100:0,fmt:fmtP,color:'var(--green)'},
+    {key:'likes',label:'いいね TOP5',icon:'❤️',fn:r=>r.likes,fmt:fmt,color:'var(--red)'},
+  ];
+  el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:4px">`+
+    metrics.map(m=>{
+      const sorted=[...rows].sort((a,b)=>m.fn(b)-m.fn(a)).slice(0,TOP);
+      const maxV=m.fn(sorted[0])||1;
+      return`<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+          <span style="font-size:18px">${m.icon}</span>
+          <span style="font-size:12px;font-weight:700;color:var(--text2)">${m.label}</span>
+        </div>
+        <div style="padding:8px 0">`+
+        sorted.map((r,i)=>{
+          const v=m.fn(r);const pct=Math.round(v/maxV*100);
+          const ac=acctColor(r.account);const dc=deptColor(r.dept);
+          const rankColor=i===0?'#F59E0B':i===1?'#9CA3AF':i===2?'#CD7C54':'var(--text3)';
+          return`<div style="padding:8px 16px;border-bottom:1px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+              <span style="font-size:13px;font-weight:800;color:${rankColor};width:18px">#${i+1}</span>
+              <span style="font-size:18px;font-weight:800;color:${m.color};font-family:var(--mono)">${m.fmt(v)}</span>
+              <span style="margin-left:auto;font-size:10px;color:var(--text3);font-family:var(--mono)">${r.date.substring(0,10)}</span>
+            </div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:5px">
+              <span style="font-size:10px;padding:1px 6px;border-radius:4px;background:${ac}22;color:${ac}">${r.account}</span>
+              ${r.dept?`<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:${dc}22;color:${dc}">${r.dept}</span>`:''}
+            </div>
+            <a href="${r.url}" target="_blank" style="font-size:10px;color:var(--text3);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.url.replace(/https?:\/\/(twitter|x)\.com\//,'').substring(0,45)}</a>
+            <div style="margin-top:5px;height:3px;background:var(--surface2);border-radius:2px">
+              <div style="height:3px;background:${m.color};border-radius:2px;width:${pct}%"></div>
+            </div>
+          </div>`;
+        }).join('')+
+        `</div></div>`;
+    }).join('')+`</div>`;
+}
+
 function renderBreakdown(){
   const month=document.getElementById('brkMonthSel')?.value||'all';
   const acct=document.getElementById('brkAcctSel')?.value||'all';
