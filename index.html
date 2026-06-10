@@ -391,7 +391,9 @@ const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbxNim3ElxVJBL1VI1-P
 // ============================================================
 
 const ACCOUNTS=[{name:'DetonatioN',color:'#3866F5'},{name:'VALORANT',color:'#e879a0'},{name:'第五人格',color:'#2dd4a0'},{name:'esports',color:'#f5a623'}];
-const DEPTS=['LoL','VALORANT','Fortnite','スマブラ','格ゲー','シャドバ','ストリーマー','ポケモンユナイト','第五人格','2XKO','その他'];
+const DEPTS=['LoL','VALORANT','Fortnite','スマブラ','SF6','餓狼伝説','シャドバ','ストリーマー','ポケモンユナイト','第五人格','2XKO','VALORANT AD','LoL AD','その他'];
+const DEPT_MAP={'格ゲー':'SF6','VALORANT Acad':'VALORANT AD','LoL Academy':'LoL AD'};
+function normalizeDept(d){return DEPT_MAP[d]||d;}
 const GENRES=['チーム情報','大会情報','イベント情報','キャンペーン情報','スポンサー関連','DFM CREW','DFM PARK','日常','現地画像','動画','出演情報','その他','グッズ','はこおし','広報施策関連','外部案件'];
 const DCOL={'LoL':'#3866F5','VALORANT':'#e879a0','Fortnite':'#2dd4a0','スマブラ':'#f5a623','格ゲー':'#7c5cfc','シャドバ':'#ff7043','ストリーマー':'#38bdf8','ポケモンユナイト':'#a3e635','第五人格':'#fb7185','2XKO':'#818cf8','その他':'#8b8fa8'};
 const PAL=['#4f7fff','#7c5cfc','#2dd4a0','#f5a623','#e879a0','#ff7043','#38bdf8','#818cf8'];
@@ -801,17 +803,28 @@ function normalizeDFMDate(str){
 }
 function parseDFMCsv(text,acct){
   const rows=parseCSVFull(text);if(rows.length<2)return[];
-  const hdr=rows[0];
-  // 列インデックス: 部門0,ジャンル1,投稿者2,URL3,日付4,IMP5,ENG6,ER7,RT8,リプライ9,いいね10,profile11,url_click12,ハッシュ13,detail14,media15
+  // ヘッダー名で列インデックスを動的検出
+  const hdr=rows[0].map(h=>(h||'').replace(/\s+/g,''));
+  const ci=name=>hdr.findIndex(h=>h.includes(name));
+  const iDept=ci('部門'),iGenre=ci('ジャンル');
+  const iUrl=ci('URL'),iDate=ci('日付');
+  const iImp=ci('インプレッション'),iEng=hdr.findIndex(h=>h.includes('エンゲージ')&&!h.includes('率'));
+  const iRt=ci('RT'),iReply=ci('リプライ'),iLikes=ci('いいね');
+  const iProf=ci('プロフィール'),iUrlC=ci('URLクリック'),iDetail=ci('詳細'),iMedia=ci('メディア');
+  if(iUrl<0||iDate<0)return[];
   const results=[];
   for(let i=1;i<rows.length;i++){
     const c=rows[i];if(c.length<5)continue;
-    const dateRaw=(c[4]||'').trim();if(!dateRaw||dateRaw==='-')continue;
-    const url=(c[3]||'').trim();if(!url)continue;
-    results.push({account:acct,dept:(c[0]||'').trim(),genre:(c[1]||'').trim(),url,
-      date:normalizeDFMDate(dateRaw),
-      impressions:pn(c[5]),engagements:pn(c[6]),rt:pn(c[8]),reply:pn(c[9]),likes:pn(c[10]),
-      profile_click:pn(c[11]),url_click:pn(c[12]),detail_click:pn(c[14]),media_play:pn(c[15]||'0')});
+    const dateRaw=(iDate>=0?c[iDate]||'':'').trim();if(!dateRaw||dateRaw==='-')continue;
+    const url=(c[iUrl]||'').trim();if(!url)continue;
+    results.push({account:acct,
+      dept:normalizeDept((iDept>=0?c[iDept]||'':'').trim()),
+      genre:(iGenre>=0?c[iGenre]||'':'').trim(),
+      url,date:normalizeDFMDate(dateRaw),
+      impressions:pn(iImp>=0?c[iImp]:''),engagements:pn(iEng>=0?c[iEng]:''),
+      rt:pn(iRt>=0?c[iRt]:''),reply:pn(iReply>=0?c[iReply]:''),likes:pn(iLikes>=0?c[iLikes]:''),
+      profile_click:pn(iProf>=0?c[iProf]:''),url_click:pn(iUrlC>=0?c[iUrlC]:''),
+      detail_click:pn(iDetail>=0?c[iDetail]:''),media_play:pn(iMedia>=0?c[iMedia]:'')});
   }
   return results;
 }
@@ -965,7 +978,7 @@ async function loadFromSheet() {
     // 投稿データ
     if (data.posts && data.posts.length) {
       allData = data.posts.map(r => ({
-        account: r.account||'', dept: r.dept||'', genre: r.genre||'',
+        account: r.account||'', dept: normalizeDept(r.dept||''), genre: r.genre||'',
         url: r.url||'', date: (r.date||'').substring(0,16),
         impressions:+r.impressions||0, engagements:+r.engagements||0,
         rt:+r.rt||0, reply:+r.reply||0, likes:+r.likes||0,
