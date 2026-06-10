@@ -600,11 +600,15 @@ function renderFollowers(){
   renderFwKpi();renderFwInputGrid();syncFwPeriod();renderFwCharts();renderFwTable();
 }
 function syncFwPeriod(){
-  const months=[...new Set(ACCOUNTS.flatMap(a=>(followerLog[a.name]||[]).map(e=>e.date.substring(0,7))))].sort().reverse();
+  const allDates=[...new Set(ACCOUNTS.flatMap(a=>(followerLog[a.name]||[]).map(e=>e.date)))].sort();
+  const fySet=new Set();
+  allDates.forEach(d=>{const y=+d.substring(0,4),m=+d.substring(5,7);fySet.add(m>=6?y:y-1);});
+  const fys=[...fySet].sort().reverse();
   const el=document.getElementById('fwPeriodSel');if(!el)return;
   const cur=el.value;
-  el.innerHTML='<option value="all">全期間</option>'+months.map(m=>`<option value="${m}">${m}</option>`).join('');
-  if(months.includes(cur))el.value=cur;
+  el.innerHTML='<option value="all">全期間</option>'+fys.map(fy=>`<option value="fy${fy}">FY${fy}（${fy}/06〜${fy+1}/05）</option>`).join('');
+  if(fys.map(fy=>'fy'+fy).includes(cur))el.value=cur;
+  else if(fys.length>0)el.value='fy'+fys[0];
 }
 function renderFwKpi(){
   document.getElementById('fwKpiGrid').innerHTML=ACCOUNTS.map(a=>{
@@ -619,7 +623,12 @@ function renderFwInputGrid(){
     const log=(followerLog[a.name]||[]).sort((x,y)=>x.date.localeCompare(y.date));
     const hist=log.map((e,i)=>{
       const prev=log[i-1];const d=prev?e.count-prev.count:null;const cls=d!==null?(d>=0?'up':'down'):'flat';
-      return`<div class="fw-history-row"><span class="fw-date">${e.date}</span><span class="fw-num">${fmt(e.count)}</span><span class="fw-delta ${cls}">${d!==null?(d>=0?'+':'')+fmt(d):'初回'}</span><button onclick="deleteFw('${a.name}','${e.date}')" style="margin-left:4px;padding:1px 6px;border:1px solid var(--border2);border-radius:3px;background:transparent;color:var(--red);font-size:10px;cursor:pointer;line-height:1.5">×</button></div>`;
+      const mon=e.date.substring(0,7);
+      const lastInMonth=log.filter(x=>x.date.startsWith(mon)).slice(-1)[0];
+      const isME=lastInMonth&&lastInMonth.date===e.date;
+      const rowStyle=isME?'font-weight:600':'font-size:11px;opacity:.75';
+      const meBadge=isME?`<span style="font-size:9px;background:var(--border);border-radius:3px;padding:0 3px;margin-left:3px;color:var(--text3)">月末</span>`:'';
+      return`<div class="fw-history-row" style="${rowStyle}"><span class="fw-date">${e.date}${meBadge}</span><span class="fw-num">${fmt(e.count)}</span><span class="fw-delta ${cls}">${d!==null?(d>=0?'+':'')+fmt(d):'初回'}</span><button onclick="deleteFw('${a.name}','${e.date}')" style="margin-left:4px;padding:1px 6px;border:1px solid var(--border2);border-radius:3px;background:transparent;color:var(--red);font-size:10px;cursor:pointer;line-height:1.5">×</button></div>`;
     }).join('');
     return`<div class="fw-card"><div class="fw-card-title"><span class="acct-dot" style="background:${a.color}"></span>${a.name}</div><div class="fw-entry-row"><input type="date" id="fwD_${a.name}" value="${new Date().toISOString().substring(0,10)}"><input type="number" id="fwC_${a.name}" placeholder="フォロワー数"><button class="fw-add-btn" onclick="addFw('${a.name}')">記録</button></div><div id="fwMsg_${a.name}" style="font-size:10px;min-height:14px;margin-bottom:2px"></div><div class="fw-history">${hist||'<div style="color:var(--text3);font-size:11px;padding:6px 0">記録なし</div>'}</div></div>`;
   }).join('');
@@ -650,11 +659,39 @@ function deleteFw(name,date){
 function renderFwCharts(){
   dchart(['fwTrend','fwDelta']);
   const period=document.getElementById('fwPeriodSel')?.value||'all';
-  const allD=[...new Set(ACCOUNTS.flatMap(a=>(followerLog[a.name]||[]).map(e=>e.date)))].filter(d=>period==='all'||d.startsWith(period)).sort();
+  let coreStart=null,coreEnd=null,allD;
+  if(period.startsWith('fy')){
+    const fy=+period.slice(2);
+    coreStart=`${fy}-06-01`;coreEnd=`${fy+1}-05-31`;
+    const bufStart=`${fy}-03-01`,bufEnd=`${fy+1}-08-31`;
+    allD=[...new Set(ACCOUNTS.flatMap(a=>(followerLog[a.name]||[]).map(e=>e.date)))].filter(d=>d>=bufStart&&d<=bufEnd).sort();
+  } else {
+    allD=[...new Set(ACCOUNTS.flatMap(a=>(followerLog[a.name]||[]).map(e=>e.date)))].sort();
+  }
   if(!allD.length)return;
-  const labels=allD.map(d=>{const dt=new Date(d);return`${dt.getMonth()+1}/${dt.getDate()}`;});
-  const mkDS=()=>ACCOUNTS.map(a=>{const m={};(followerLog[a.name]||[]).forEach(e=>m[e.date]=e.count);return{label:a.name,data:allD.map(d=>m[d]??null),borderColor:a.color,backgroundColor:a.color+'22',fill:false,tension:0.4,pointRadius:3,borderWidth:2,spanGaps:true};});
-  const mkDD=()=>ACCOUNTS.map(a=>{const s=(followerLog[a.name]||[]).sort((x,y)=>x.date.localeCompare(y.date));const m={};s.forEach((e,i)=>{if(i>0)m[e.date]=e.count-s[i-1].count;});return{label:a.name,data:allD.map(d=>m[d]??null),borderColor:a.color,backgroundColor:a.color+'33',fill:false,tension:0.4,pointRadius:3,borderWidth:2,spanGaps:false};});
+  // 月末判定: 各月の最後の日付
+  const byMon={};allD.forEach(d=>{const mo=d.substring(0,7);if(!byMon[mo]||d>byMon[mo])byMon[mo]=d;});
+  const monthEnds=new Set(Object.values(byMon));
+  const inCore=d=>!coreStart||(d>=coreStart&&d<=coreEnd);
+  const labels=allD.map(d=>{const dt=new Date(d);const lbl=`${dt.getMonth()+1}/${dt.getDate()}`;return lbl;});
+  const mkDS=()=>ACCOUNTS.map(a=>{
+    const m={};(followerLog[a.name]||[]).forEach(e=>m[e.date]=e.count);
+    const ptR=allD.map(d=>monthEnds.has(d)?7:2);
+    const ptBg=allD.map(d=>inCore(d)?(monthEnds.has(d)?a.color:a.color+'99'):(monthEnds.has(d)?a.color+'66':a.color+'33'));
+    const ptBd=allD.map(d=>inCore(d)?a.color:a.color+'44');
+    return{label:a.name,data:allD.map(d=>m[d]??null),
+      borderColor:a.color,backgroundColor:a.color+'22',fill:false,tension:0.4,
+      pointRadius:ptR,pointHoverRadius:allD.map(d=>monthEnds.has(d)?9:4),
+      pointBackgroundColor:ptBg,pointBorderColor:ptBd,pointBorderWidth:2,
+      borderWidth:2,spanGaps:true,
+      segment:{borderColor:ctx=>{const d1=allD[ctx.p0DataIndex],d2=allD[ctx.p1DataIndex];return(inCore(d1)&&inCore(d2))?a.color:a.color+'33';}}};
+  });
+  const mkDD=()=>ACCOUNTS.map(a=>{
+    const s=(followerLog[a.name]||[]).sort((x,y)=>x.date.localeCompare(y.date));
+    const m={};s.forEach((e,i)=>{if(i>0)m[e.date]=e.count-s[i-1].count;});
+    const bg=allD.map(d=>inCore(d)?(monthEnds.has(d)?a.color+'cc':a.color+'55'):(monthEnds.has(d)?a.color+'44':a.color+'22'));
+    const bd=allD.map(d=>inCore(d)?a.color:a.color+'44');
+    return{label:a.name,data:allD.map(d=>m[d]??null),backgroundColor:bg,borderColor:bd,borderWidth:1,spanGaps:false};});
   const mkLeg=id=>document.getElementById(id).innerHTML=ACCOUNTS.map(a=>`<span class="legend-item"><span class="legend-sq" style="background:${a.color}"></span>${a.name}</span>`).join('');
   mkLeg('fwChartLegend');mkLeg('fwDeltaLegend');
   charts.fwTrend=new Chart(document.getElementById('fwTrendChart'),{type:'line',data:{labels,datasets:mkDS()},options:bOpts()});
@@ -662,16 +699,32 @@ function renderFwCharts(){
 }
 function renderFwTable(){
   const period=document.getElementById('fwPeriodSel')?.value||'all';
-  const allD=[...new Set(ACCOUNTS.flatMap(a=>(followerLog[a.name]||[]).map(e=>e.date)))].filter(d=>period==='all'||d.startsWith(period)).sort();
+  let allD,coreStart=null,coreEnd=null;
+  if(period.startsWith('fy')){
+    const fy=+period.slice(2);
+    coreStart=`${fy}-06-01`;coreEnd=`${fy+1}-05-31`;
+    const bufStart=`${fy}-03-01`,bufEnd=`${fy+1}-08-31`;
+    allD=[...new Set(ACCOUNTS.flatMap(a=>(followerLog[a.name]||[]).map(e=>e.date)))].filter(d=>d>=bufStart&&d<=bufEnd).sort();
+  } else {
+    allD=[...new Set(ACCOUNTS.flatMap(a=>(followerLog[a.name]||[]).map(e=>e.date)))].sort();
+  }
   if(!allD.length){document.getElementById('fwTable').innerHTML='<tr><td style="padding:20px;color:var(--text3);font-size:12px">フォロワーデータがありません</td></tr>';return;}
+  const byMon={};allD.forEach(d=>{const mo=d.substring(0,7);if(!byMon[mo]||d>byMon[mo])byMon[mo]=d;});
+  const monthEnds=new Set(Object.values(byMon));
+  const inCore=d=>!coreStart||(d>=coreStart&&d<=coreEnd);
   const th=`<thead><tr><th class="left">日付</th>${ACCOUNTS.map(a=>`<th style="color:${a.color};text-align:right">${a.name}</th><th style="color:${a.color};text-align:right;opacity:.6">前回比</th>`).join('')}</tr></thead>`;
   const rows=allD.map(d=>{
+    const isME=monthEnds.has(d),isC=inCore(d);
+    const rStyle=isME?'background:var(--panel2);font-weight:700':(isC?'':'opacity:.45');
     const cells=ACCOUNTS.map(a=>{
       const log=(followerLog[a.name]||[]).sort((x,y)=>x.date.localeCompare(y.date));const entry=log.find(e=>e.date===d);if(!entry)return'<td>-</td><td>-</td>';
       const idx=log.indexOf(entry);const prev=idx>0?log[idx-1]:null;const delta=prev?entry.count-prev.count:null;const cls=delta!==null?(delta>=0?'up':'down'):'flat';
-      return`<td>${fmt(entry.count)}</td><td class="${cls}">${delta!==null?(delta>=0?'+':'')+fmt(delta):'-'}</td>`;
+      const fs=isME?'':'font-size:11px;';
+      return`<td style="${fs}">${fmt(entry.count)}</td><td class="${cls}" style="${fs}">${delta!==null?(delta>=0?'+':'')+fmt(delta):'-'}</td>`;
     }).join('');
-    return`<tr><td class="left" style="font-family:var(--mono)">${d}</td>${cells}</tr>`;
+    const meBadge=isME?` <span style="font-size:9px;background:var(--border);border-radius:3px;padding:0 3px;color:var(--text3)">月末</span>`:'';
+    const dtStyle=isME?'font-family:var(--mono)':'font-family:var(--mono);font-size:11px;color:var(--text3)';
+    return`<tr style="${rStyle}"><td class="left" style="${dtStyle}">${d}${meBadge}</td>${cells}</tr>`;
   }).join('');
   document.getElementById('fwTable').innerHTML=th+`<tbody>${rows}</tbody>`;
 }
