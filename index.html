@@ -768,8 +768,18 @@ function syncBestPeriod(){
   const rows=acct?allData.filter(r=>r.account===acct):allData;
   const sel=document.getElementById('bestPeriod');if(!sel)return;
   const cur=sel.value;
-  // 日付を正規化（"Wed May 19 2026" や "2026-05-19 07:00" 両対応）
-  const toNorm=d=>{const ms=Date.parse(d);if(isNaN(ms))return null;const dt=new Date(ms);return dt;};
+  // 日付から確実にDateオブジェクトを取得（形式不問）
+  const toNorm=d=>{
+    if(!d)return null;const s=String(d).trim();
+    // "2026-05-04 05:09" or "2026-05-04"
+    const iso=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(iso)return new Date(+iso[1],+iso[2]-1,+iso[3]);
+    // "2026/5/4 5:09"
+    const sl=s.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+    if(sl)return new Date(+sl[1],+sl[2]-1,+sl[3]);
+    // "Tue Jun 02 2026" etc.
+    const ms=Date.parse(s);return isNaN(ms)?null:new Date(ms);
+  };
   let opts=[];
   if(type==='month'){
     const mset=new Set();
@@ -796,7 +806,12 @@ function renderBest(){
   const period=document.getElementById('bestPeriod')?.value||'';
   if(!period){el.innerHTML='<p style="color:var(--text3);padding:24px">データがありません</p>';return;}
   let rows=acct?allData.filter(r=>r.account===acct):allData;
-  const toD=s=>{const ms=Date.parse(s);return isNaN(ms)?null:new Date(ms);};
+  const toD=s=>{
+    if(!s)return null;const str=String(s).trim();
+    const iso=str.match(/^(\d{4})-(\d{2})-(\d{2})/);if(iso)return new Date(+iso[1],+iso[2]-1,+iso[3]);
+    const sl=str.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);if(sl)return new Date(+sl[1],+sl[2]-1,+sl[3]);
+    const ms=Date.parse(str);return isNaN(ms)?null:new Date(ms);
+  };
   if(type==='month'){
     const [py,pm]=period.split('-').map(Number);
     rows=rows.filter(r=>{const d=toD(r.date);return d&&d.getFullYear()===py&&d.getMonth()+1===pm;});
