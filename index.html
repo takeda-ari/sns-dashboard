@@ -880,6 +880,12 @@ function renderBest(){
           const v=m.fn(r);const pct=Math.round(v/maxV*100);
           const ac=acctColor(r.account);const dc=deptColor(r.dept);
           const rankColor=i===0?'#D97706':i===1?'#6B7280':i===2?'#92400E':'var(--text2)';
+          const er2=r.impressions>0?r.engagements/r.impressions*100:0;
+          const subMetrics={
+            imp:[{label:'ER',val:fmtP(er2),color:'var(--green)'},{label:'いいね',val:fmt(r.likes),color:'var(--red)'}],
+            er: [{label:'IMP',val:fmt(r.impressions),color:'var(--accent)'},{label:'いいね',val:fmt(r.likes),color:'var(--red)'}],
+            likes:[{label:'IMP',val:fmt(r.impressions),color:'var(--accent)'},{label:'ER',val:fmtP(er2),color:'var(--green)'}],
+          }[m.key]||[];
           return`<div style="padding:8px 16px;border-bottom:1px solid var(--border)">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
               <span style="font-size:13px;font-weight:800;color:${rankColor};width:18px">#${i+1}</span>
@@ -891,6 +897,9 @@ function renderBest(){
               ${r.dept?`<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:${dc}22;color:${dc}">${r.dept}</span>`:''}
             </div>
             <a href="${r.url}" target="_blank" style="font-size:10px;color:var(--text3);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.url.replace(/https?:\/\/(twitter|x)\.com\//,'').substring(0,45)}</a>
+            <div style="display:flex;gap:10px;margin-top:5px">
+              ${subMetrics.map(s=>`<span style="font-size:10px;font-family:var(--mono);color:var(--text2)"><span style="color:${s.color};font-weight:700">${s.label}</span> ${s.val}</span>`).join('')}
+            </div>
             <div style="margin-top:5px;height:3px;background:var(--surface2);border-radius:2px">
               <div style="height:3px;background:${m.color};border-radius:2px;width:${pct}%"></div>
             </div>
