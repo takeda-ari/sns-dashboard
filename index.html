@@ -791,6 +791,30 @@ function parseXCsv(text,acct){
   }
   return results;
 }
+function normalizeDFMDate(str){
+  // "2026/5/4 5:09" → "2026-05-04 05:09"
+  const s=(str||'').trim();const sp=s.split(' ');
+  const dp=sp[0]||'';const tp=sp[1]||'00:00';
+  const [y,m,d]=dp.split('/');const [h,mi]=(tp+':00').split(':');
+  if(!y||!m||!d)return s;
+  return`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')} ${String(h).padStart(2,'0')}:${String(mi||'0').padStart(2,'0')}`;
+}
+function parseDFMCsv(text,acct){
+  const rows=parseCSVFull(text);if(rows.length<2)return[];
+  const hdr=rows[0];
+  // 列インデックス: 部門0,ジャンル1,投稿者2,URL3,日付4,IMP5,ENG6,ER7,RT8,リプライ9,いいね10,profile11,url_click12,ハッシュ13,detail14,media15
+  const results=[];
+  for(let i=1;i<rows.length;i++){
+    const c=rows[i];if(c.length<5)continue;
+    const dateRaw=(c[4]||'').trim();if(!dateRaw||dateRaw==='-')continue;
+    const url=(c[3]||'').trim();if(!url)continue;
+    results.push({account:acct,dept:(c[0]||'').trim(),genre:(c[1]||'').trim(),url,
+      date:normalizeDFMDate(dateRaw),
+      impressions:pn(c[5]),engagements:pn(c[6]),rt:pn(c[8]),reply:pn(c[9]),likes:pn(c[10]),
+      profile_click:pn(c[11]),url_click:pn(c[12]),detail_click:pn(c[14]),media_play:pn(c[15]||'0')});
+  }
+  return results;
+}
 function readAsText(file){
   return new Promise((resolve,reject)=>{
     const fr=new FileReader();
@@ -811,7 +835,10 @@ async function handleXCsv(file){
   if(!acct){document.getElementById('importMsg').innerHTML='<span style="color:var(--red)">アカウントを選択してください</span>';return;}
   document.getElementById('importMsg').innerHTML='<span style="color:var(--text2)">読み込み中...</span>';
   try{
-    const text=await readAsText(file);const rows=parseXCsv(text,acct);
+    const text=await readAsText(file);
+    const hdrRows=parseCSVFull(text);
+    const isDFM=hdrRows.length>0&&(hdrRows[0][0]||'').trim().includes('部門');
+    const rows=isDFM?parseDFMCsv(text,acct):parseXCsv(text,acct);
     if(!rows.length){document.getElementById('importMsg').innerHTML='<span style="color:var(--red)">データが見つかりませんでした</span>';return;}
     pendingRows=rows;showTagEditor(acct,rows);
     document.getElementById('importMsg').innerHTML=`<span style="color:var(--green)">✓ ${rows.length}件読み込みました。部門・ジャンルを設定してください。</span>`;
@@ -823,14 +850,14 @@ function showTagEditor(acct,rows){
   syncSel();
   document.getElementById('tagEditorSection').style.display='';
   document.getElementById('tagEditorTitle').textContent=`${acct} — ${rows.length}件`;
-  const dOpts='<option value="">未設定</option>'+DEPTS.map(d=>`<option>${d}</option>`).join('');
-  const gOpts='<option value="">未設定</option>'+GENRES.map(g=>`<option>${g}</option>`).join('');
+  const dOpts=(v)=>'<option value="">未設定</option>'+DEPTS.map(d=>`<option${d===v?' selected':''}>${d}</option>`).join('');
+  const gOpts=(v)=>'<option value="">未設定</option>'+GENRES.map(g=>`<option${g===v?' selected':''}>${g}</option>`).join('');
   document.getElementById('tagEditorRows').innerHTML=rows.map((r,i)=>`
     <div class="tag-row">
       <div class="tag-cell" style="font-family:var(--mono);font-size:10px;color:var(--text3)">${r.date.substring(0,10)}</div>
       <div class="tag-cell url-c" title="${r.url}">${r.url.replace(/https?:\/\/(twitter|x)\.com\//,'').substring(0,35)}</div>
-      <div class="tag-cell"><select id="td_${i}">${dOpts}</select></div>
-      <div class="tag-cell"><select id="tg_${i}">${gOpts}</select></div>
+      <div class="tag-cell"><select id="td_${i}">${dOpts(r.dept||'')}</select></div>
+      <div class="tag-cell"><select id="tg_${i}">${gOpts(r.genre||'')}</select></div>
       <div class="tag-cell tag-check"><input type="checkbox" id="tc_${i}" checked></div>
     </div>`).join('');
   document.getElementById('tagEditorSection').scrollIntoView({behavior:'smooth',block:'start'});
