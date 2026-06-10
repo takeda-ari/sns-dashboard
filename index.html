@@ -450,7 +450,7 @@ function renderDashTabs(){
 function selAcct(n){currentDashAcct=n;renderSidebar();renderDashTabs();renderDash();}
 function syncSel(){
   const viewMode=document.getElementById('dashViewSel')?.value||'week';
-  const getYM=d=>{const p=String(d).match(/(\d{4})[\/\-](\d{1,2})/);return p?`${p[1]}-${String(+p[2]).padStart(2,'0')}`:''};
+  const getYM=d=>{const s=String(d);const p=s.match(/(\d{4})[\/\-](\d{1,2})/);if(p)return`${p[1]}-${String(+p[2]).padStart(2,'0')}`;const dt=parseLocalDate(s);return dt?`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`:''};
   const months=[...new Set(allData.map(d=>getYM(d.date)).filter(Boolean))].sort().reverse();
   const years=[...new Set(allData.map(d=>{const p=String(d.date).match(/(\d{4})/);return p?p[1]:'';}).filter(Boolean))].sort().reverse();
   const dashOpts=viewMode==='month'?years:months;
@@ -484,7 +484,14 @@ function stats(rows){
   return{count:rows.length,imp,eng,er:imp>0?(eng/imp*100):0,rt:sum('rt'),reply:sum('reply'),likes:sum('likes'),prof:sum('profile_click'),urlCl:sum('url_click'),detail:sum('detail_click'),media:sum('media_play'),avgImp:imp/rows.length,avgEng:eng/rows.length,medImp:med(rows.map(r=>r.impressions))};
 }
 function med(arr){const s=[...arr].sort((a,b)=>a-b);const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2;}
-function parseLocalDate(s){const p=String(s).match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);return p?new Date(+p[1],+p[2]-1,+p[3]):null;}
+function parseLocalDate(s){
+  const str=String(s);
+  const p=str.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if(p)return new Date(+p[1],+p[2]-1,+p[3]);
+  const ms=Date.parse(str);
+  if(!isNaN(ms)){const d=new Date(ms);return new Date(d.getFullYear(),d.getMonth(),d.getDate());}
+  return null;
+}
 function weeks(rows){
   const wk={};
   rows.forEach(r=>{
@@ -500,8 +507,11 @@ function weeks(rows){
 function mons(rows){
   const mo={};
   rows.forEach(r=>{
-    const p=String(r.date).match(/(\d{4})[\/\-](\d{1,2})/);
-    if(!p)return;const key=`${p[1]}-${String(+p[2]).padStart(2,'0')}`;
+    const s=String(r.date);
+    const p=s.match(/(\d{4})[\/\-](\d{1,2})/);
+    let key;
+    if(p){key=`${p[1]}-${String(+p[2]).padStart(2,'0')}`;}
+    else{const dt=parseLocalDate(s);if(!dt)return;key=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`;}
     if(!mo[key])mo[key]={rows:[]};mo[key].rows.push(r);
   });
   return Object.entries(mo).sort((a,b)=>a[0].localeCompare(b[0]));
@@ -745,7 +755,7 @@ function renderFwCharts(){
   const inCore=d=>!coreStart||(d>=coreStart&&d<=coreEnd);
   const multiYear=new Set(allD.map(d=>d.substring(0,4))).size>1;
   const parseD=d=>{const p=d.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);return p?[+p[1],+p[2],+p[3]]:null;};
-  const labels=allD.map(d=>{const p=parseD(d);if(!p)return d;const[,y,m,day]=p;return(multiYear&&monthEnds.has(d))?`'${String(y).slice(2)}/${m}/${day}`:`${m}/${day}`;});
+  const labels=allD.map(d=>{const p=parseD(d);if(!p)return d;const[y,m,day]=p;return(multiYear&&monthEnds.has(d))?`'${String(y).slice(2)}/${m}/${day}`:`${m}/${day}`;});
   const mkDS=()=>ACCOUNTS.map(a=>{
     const m={};(followerLog[a.name]||[]).forEach(e=>m[e.date]=e.count);
     const ptR=allD.map(d=>monthEnds.has(d)?7:2);
