@@ -167,6 +167,7 @@ input[type=file]{display:none}
   <div class="page-header">
     <div class="page-title">ダッシュボード <span id="dashSubtitle"></span></div>
     <div class="header-controls">
+      <select class="ctrl-btn" id="dashViewSel" onchange="syncSel();renderDash()"><option value="week">週次</option><option value="month">月次</option></select>
       <select class="ctrl-btn" id="monthSel" onchange="renderDash()"><option value="all">全期間</option></select>
       <button class="ctrl-btn" onclick="downloadCSV()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>エクスポート</button>
     </div>
@@ -175,13 +176,13 @@ input[type=file]{display:none}
   <div id="followerHeroArea"></div>
   <div class="kpi-grid" id="kpiGrid"></div>
   <div class="charts-grid">
-    <div class="chart-card"><div class="chart-label">インプレッション 週別推移</div><div style="position:relative;height:155px"><canvas id="impChart" role="img" aria-label="IMP推移"></canvas></div></div>
+    <div class="chart-card"><div class="chart-label" id="impChartLabel">インプレッション 週別推移</div><div style="position:relative;height:155px"><canvas id="impChart" role="img" aria-label="IMP推移"></canvas></div></div>
     <div class="chart-card"><div class="chart-label">エンゲージメント率（%）</div><div style="position:relative;height:155px"><canvas id="erChart" role="img" aria-label="ER推移"></canvas></div></div>
     <div class="chart-card"><div class="chart-label" id="reactionChartLabel">いいね / RT / リプライ</div><div id="reactionLegend" class="legend-row"></div><div style="position:relative;height:135px"><canvas id="reactionChart" role="img" aria-label="反応数"></canvas></div></div>
     <div class="chart-card"><div class="chart-label">部門別インプレッション</div><div style="position:relative;height:155px"><canvas id="deptChart" role="img" aria-label="部門別"></canvas></div></div>
     <div class="chart-card wide"><div class="chart-label" id="clickChartLabel">URLクリック / プロフィールCL / メディア再生</div><div id="clickLegend" class="legend-row"></div><div style="position:relative;height:120px"><canvas id="clickChart" role="img" aria-label="クリック系"></canvas></div></div>
   </div>
-  <div class="section"><div class="section-title">週別集計</div>
+  <div class="section"><div class="section-title" id="weekTableTitle">週別集計</div>
     <div class="table-wrap"><div class="table-scroll"><table><thead><tr>
       <th class="left">期間</th><th>IMP</th><th>エンゲージ</th><th>ER%</th><th>RT</th><th>リプライ</th><th>いいね</th><th>プロフCL</th><th>URL CL</th><th>詳細CL</th><th>メディア再生</th>
     </tr></thead><tbody id="weekBody"></tbody></table></div></div>
@@ -448,9 +449,12 @@ function renderDashTabs(){
 }
 function selAcct(n){currentDashAcct=n;renderSidebar();renderDashTabs();renderDash();}
 function syncSel(){
+  const viewMode=document.getElementById('dashViewSel')?.value||'week';
   const months=[...new Set(allData.map(d=>d.date.substring(0,7)))].sort().reverse();
+  const years=[...new Set(allData.map(d=>d.date.substring(0,4)))].sort().reverse();
+  const dashOpts=viewMode==='month'?years:months;
   const an=ACCOUNTS.map(a=>a.name);
-  [{id:'monthSel',ao:'<option value="all">全期間</option>',opts:months},{id:'cmpMonthSel',ao:'<option value="all">全期間</option>',opts:months},{id:'filterMonth2',ao:'<option value="">全期間</option>',opts:months},{id:'brkMonthSel',ao:'<option value="all">全期間</option>',opts:months}].forEach(c=>{
+  [{id:'monthSel',ao:'<option value="all">全期間</option>',opts:dashOpts},{id:'cmpMonthSel',ao:'<option value="all">全期間</option>',opts:months},{id:'filterMonth2',ao:'<option value="">全期間</option>',opts:months},{id:'brkMonthSel',ao:'<option value="all">全期間</option>',opts:months}].forEach(c=>{
     const el=document.getElementById(c.id);if(!el)return;const cur=el.value;
     el.innerHTML=c.ao+c.opts.map(m=>`<option value="${m}">${m}</option>`).join('');el.value=cur;
   });
@@ -490,15 +494,32 @@ function weeks(rows){
   });
   return Object.entries(wk).sort((a,b)=>a[0].localeCompare(b[0]));
 }
+function mons(rows){
+  const mo={};
+  rows.forEach(r=>{const key=r.date.substring(0,7);if(!mo[key])mo[key]={rows:[]};mo[key].rows.push(r);});
+  return Object.entries(mo).sort((a,b)=>a[0].localeCompare(b[0]));
+}
 function dchart(keys){(keys||Object.keys(charts)).forEach(k=>{if(charts[k]){try{charts[k].destroy()}catch(e){}delete charts[k];}});}
 function bOpts(){return{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(0,0,0,0.05)'},ticks:{color:'#9299B0',font:{size:9},maxRotation:45,autoSkip:false}},y:{grid:{color:'rgba(0,0,0,0.06)'},ticks:{color:'#9299B0',font:{size:9}}}}};}
 
 function renderDash(){
   renderDashTabs();
-  const month=document.getElementById('monthSel')?.value||'all';
-  const rows=filt(month,currentDashAcct);
-  document.getElementById('dashSubtitle').textContent=(currentDashAcct==='all'?'全アカウント':currentDashAcct)+(month!=='all'?' / '+month:'');
-  renderFwHero();renderKPI(rows);renderWeekTable(rows);renderDashCharts(rows);
+  const viewMode=document.getElementById('dashViewSel')?.value||'week';
+  const period=document.getElementById('monthSel')?.value||'all';
+  const rows=filt(period,currentDashAcct);
+  document.getElementById('dashSubtitle').textContent=(currentDashAcct==='all'?'全アカウント':currentDashAcct)+(period!=='all'?' / '+period:'');
+  const ttl=document.getElementById('weekTableTitle');
+  const impLbl=document.getElementById('impChartLabel');
+  renderFwHero();renderKPI(rows);
+  if(viewMode==='month'){
+    if(ttl)ttl.textContent='月別集計';
+    if(impLbl)impLbl.textContent='インプレッション 月別推移';
+    renderMonthTable(rows);renderDashChartsMonthly(rows);
+  } else {
+    if(ttl)ttl.textContent='週別集計';
+    if(impLbl)impLbl.textContent='インプレッション 週別推移';
+    renderWeekTable(rows);renderDashCharts(rows);
+  }
 }
 function renderFwHero(){
   const el=document.getElementById('followerHeroArea');
@@ -545,6 +566,15 @@ function renderWeekTable(rows){
     h+=`<tr class="summary-row"><td class="left">月中央値</td><td>${fmt(tot.medImp)}</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
   }
   wk.forEach(([,w])=>{const ws=stats(w.rows);if(!ws)return;h+=`<tr class="week-row"><td class="left">${fd(w.start)}〜${fd(w.end)}</td><td>${fmt(ws.imp)}</td><td>${fmt(ws.eng)}</td><td class="${erc(ws.er)}">${fmtP(ws.er)}</td><td>${fmt(ws.rt)}</td><td>${fmt(ws.reply)}</td><td>${fmt(ws.likes)}</td><td>${fmt(ws.prof)}</td><td>${fmt(ws.urlCl)}</td><td>${fmt(ws.detail)}</td><td>${fmt(ws.media)}</td></tr>`;});
+  document.getElementById('weekBody').innerHTML=h;
+}
+function renderMonthTable(rows){
+  const mo=mons(rows);const tot=stats(rows);let h='';
+  if(tot){
+    h+=`<tr class="summary-row"><td class="left">期間合計</td><td>${fmt(tot.imp)}</td><td>${fmt(tot.eng)}</td><td class="${erc(tot.er)}">${fmtP(tot.er)}</td><td>${fmt(tot.rt)}</td><td>${fmt(tot.reply)}</td><td>${fmt(tot.likes)}</td><td>${fmt(tot.prof)}</td><td>${fmt(tot.urlCl)}</td><td>${fmt(tot.detail)}</td><td>${fmt(tot.media)}</td></tr>`;
+    h+=`<tr class="summary-row"><td class="left">月平均値</td><td>${fmt(tot.avgImp)}</td><td>${fmt(tot.avgEng)}</td><td class="${erc(tot.er)}">${fmtP(tot.er)}</td><td>${fmt(tot.rt/tot.count)}</td><td>${fmt(tot.reply/tot.count)}</td><td>${fmt(tot.likes/tot.count)}</td><td>${fmt(tot.prof/tot.count)}</td><td>${fmt(tot.urlCl/tot.count)}</td><td>${fmt(tot.detail/tot.count)}</td><td>${fmt(tot.media/tot.count)}</td></tr>`;
+  }
+  mo.forEach(([key,m])=>{const ms=stats(m.rows);if(!ms)return;h+=`<tr class="week-row"><td class="left">${key}</td><td>${fmt(ms.imp)}</td><td>${fmt(ms.eng)}</td><td class="${erc(ms.er)}">${fmtP(ms.er)}</td><td>${fmt(ms.rt)}</td><td>${fmt(ms.reply)}</td><td>${fmt(ms.likes)}</td><td>${fmt(ms.prof)}</td><td>${fmt(ms.urlCl)}</td><td>${fmt(ms.detail)}</td><td>${fmt(ms.media)}</td></tr>`;});
   document.getElementById('weekBody').innerHTML=h;
 }
 function renderDashChartsCompare(month){
@@ -596,6 +626,38 @@ function renderDashCharts(rows){
   charts.click=new Chart(document.getElementById('clickChart'),{type:'line',data:{labels,datasets:[{data:get('urlCl'),borderColor:'#f5a623',fill:false,tension:0.4,pointRadius:2,borderWidth:1.5},{data:get('prof'),borderColor:'#7c5cfc',fill:false,tension:0.4,pointRadius:2,borderWidth:1.5,borderDash:[4,3]},{data:get('media'),borderColor:'#38bdf8',fill:false,tension:0.4,pointRadius:2,borderWidth:1.5,borderDash:[2,4]}]},options:bOpts()});
 }
 
+function renderDashChartsCompareMonthly(period){
+  const allMO=[...new Set(ACCOUNTS.flatMap(a=>mons(filt(period,a.name)).map(([k])=>k)))].sort();
+  const labels=allMO.map(k=>k.replace(/^(\d{4})-(\d{2})$/,'$1/$2'));
+  const mkDS=(key,pct=false)=>ACCOUNTS.map(a=>{const m={};mons(filt(period,a.name)).forEach(([k,mo])=>{const s=stats(mo.rows);m[k]=pct?(s?.er||0):(s?.[key]||0);});return{label:a.name,data:allMO.map(k=>m[k]||0),borderColor:a.color,backgroundColor:a.color+'33',fill:false,tension:0.4,pointRadius:3,borderWidth:2};});
+  const mkLeg=id=>document.getElementById(id).innerHTML=ACCOUNTS.map(a=>`<span class="legend-item"><span class="legend-sq" style="background:${a.color}"></span>${a.name}</span>`).join('');
+  charts.imp=new Chart(document.getElementById('impChart'),{type:'line',data:{labels,datasets:mkDS('imp')},options:bOpts()});
+  charts.er=new Chart(document.getElementById('erChart'),{type:'line',data:{labels,datasets:mkDS('er',true)},options:bOpts()});
+  document.getElementById('reactionChartLabel').textContent='いいね数 比較（月別）';mkLeg('reactionLegend');
+  charts.reaction=new Chart(document.getElementById('reactionChart'),{type:'bar',data:{labels,datasets:ACCOUNTS.map(a=>{const m={};mons(filt(period,a.name)).forEach(([k,mo])=>{const s=stats(mo.rows);m[k]=s?.likes||0;});return{label:a.name,data:allMO.map(k=>m[k]||0),backgroundColor:a.color+'55',borderColor:a.color,borderWidth:1,borderRadius:2};})},options:bOpts()});
+  const dm={};ACCOUNTS.forEach(a=>filt(period,a.name).forEach(r=>{if(!dm[r.dept])dm[r.dept]=0;dm[r.dept]+=r.impressions||0;}));
+  const de=Object.entries(dm).filter(([k])=>k).sort((a,b)=>b[1]-a[1]);
+  if(de.length){charts.dept=new Chart(document.getElementById('deptChart'),{type:'doughnut',data:{labels:de.map(d=>d[0]),datasets:[{data:de.map(d=>d[1]),backgroundColor:de.map(d=>deptColor(d[0])+'cc'),borderColor:de.map(d=>deptColor(d[0])),borderWidth:1.5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'right',labels:{color:'#9299B0',font:{size:9},boxWidth:7,padding:6}}}}});}
+  document.getElementById('clickChartLabel').textContent='URLクリック 比較（月別）';mkLeg('clickLegend');
+  charts.click=new Chart(document.getElementById('clickChart'),{type:'line',data:{labels,datasets:mkDS('urlCl')},options:bOpts()});
+}
+function renderDashChartsMonthly(rows){
+  dchart(['imp','er','reaction','dept','click']);
+  if(currentDashAcct==='all'){const period=document.getElementById('monthSel')?.value||'all';renderDashChartsCompareMonthly(period);return;}
+  const mo=mons(rows);const labels=mo.map(([k])=>k.replace(/^(\d{4})-(\d{2})$/,'$1/$2'));
+  const get=k=>mo.map(([,m])=>stats(m.rows)?.[k]||0);
+  const color=acctColor(currentDashAcct);
+  charts.imp=new Chart(document.getElementById('impChart'),{type:'bar',data:{labels,datasets:[{data:get('imp'),backgroundColor:color+'55',borderColor:color,borderWidth:1.5,borderRadius:4}]},options:bOpts()});
+  charts.er=new Chart(document.getElementById('erChart'),{type:'line',data:{labels,datasets:[{data:mo.map(([,m])=>+((stats(m.rows)?.er||0).toFixed(2))),borderColor:'#2dd4a0',backgroundColor:'#2dd4a018',fill:true,tension:0.4,pointRadius:4,pointBackgroundColor:'#2dd4a0'}]},options:bOpts()});
+  document.getElementById('reactionChartLabel').textContent='いいね / RT / リプライ（月別）';
+  document.getElementById('reactionLegend').innerHTML=[['いいね','#e879a0'],['RT','#4f7fff'],['リプライ','#7c5cfc']].map(([l,c])=>`<span class="legend-item"><span class="legend-sq" style="background:${c}"></span>${l}</span>`).join('');
+  charts.reaction=new Chart(document.getElementById('reactionChart'),{type:'bar',data:{labels,datasets:[{data:get('likes'),backgroundColor:'#e879a055',borderColor:'#e879a0',borderWidth:1,borderRadius:2},{data:get('rt'),backgroundColor:'#4f7fff55',borderColor:'#4f7fff',borderWidth:1,borderRadius:2},{data:get('reply'),backgroundColor:'#7c5cfc55',borderColor:'#7c5cfc',borderWidth:1,borderRadius:2}]},options:bOpts()});
+  const dm={};rows.forEach(r=>{if(!dm[r.dept])dm[r.dept]=0;dm[r.dept]+=r.impressions||0;});
+  const de=Object.entries(dm).filter(([k])=>k).sort((a,b)=>b[1]-a[1]);
+  if(de.length){charts.dept=new Chart(document.getElementById('deptChart'),{type:'doughnut',data:{labels:de.map(d=>d[0]),datasets:[{data:de.map(d=>d[1]),backgroundColor:de.map(d=>deptColor(d[0])+'cc'),borderColor:de.map(d=>deptColor(d[0])),borderWidth:1.5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'right',labels:{color:'#9299B0',font:{size:9},boxWidth:7,padding:6}}}}});}
+  document.getElementById('clickLegend').innerHTML=[['URLクリック','#f5a623'],['プロフCL','#7c5cfc'],['メディア再生','#38bdf8']].map(([l,c])=>`<span class="legend-item"><span class="legend-sq" style="background:${c}"></span>${l}</span>`).join('');
+  charts.click=new Chart(document.getElementById('clickChart'),{type:'line',data:{labels,datasets:[{data:get('urlCl'),borderColor:'#f5a623',fill:false,tension:0.4,pointRadius:3,borderWidth:1.5},{data:get('prof'),borderColor:'#7c5cfc',fill:false,tension:0.4,pointRadius:3,borderWidth:1.5,borderDash:[4,3]},{data:get('media'),borderColor:'#38bdf8',fill:false,tension:0.4,pointRadius:3,borderWidth:1.5,borderDash:[2,4]}]},options:bOpts()});
+}
 function renderFollowers(){
   renderFwKpi();renderFwInputGrid();syncFwPeriod();renderFwCharts();renderFwTable();
 }
@@ -623,9 +685,10 @@ function renderFwInputGrid(){
     const log=(followerLog[a.name]||[]).sort((x,y)=>x.date.localeCompare(y.date));
     const hist=log.map((e,i)=>{
       const prev=log[i-1];const d=prev?e.count-prev.count:null;const cls=d!==null?(d>=0?'up':'down'):'flat';
-      const mon=e.date.substring(0,7);
-      const lastInMonth=log.filter(x=>x.date.startsWith(mon)).slice(-1)[0];
-      const isME=lastInMonth&&lastInMonth.date===e.date;
+      const mon=e.date.substring(0,10).substring(0,7);
+      const monthEntries=log.filter(x=>x.date.substring(0,7)===mon);
+      const maxDate=monthEntries.reduce((mx,x)=>(x.date.substring(0,10)>mx?x.date.substring(0,10):mx),'');
+      const isME=e.date.substring(0,10)===maxDate;
       const rowStyle=isME?'font-weight:600':'font-size:11px;opacity:.75';
       const meBadge=isME?`<span style="font-size:9px;background:var(--border);border-radius:3px;padding:0 3px;margin-left:3px;color:var(--text3)">月末</span>`:'';
       return`<div class="fw-history-row" style="${rowStyle}"><span class="fw-date">${e.date}${meBadge}</span><span class="fw-num">${fmt(e.count)}</span><span class="fw-delta ${cls}">${d!==null?(d>=0?'+':'')+fmt(d):'初回'}</span><button onclick="deleteFw('${a.name}','${e.date}')" style="margin-left:4px;padding:1px 6px;border:1px solid var(--border2);border-radius:3px;background:transparent;color:var(--red);font-size:10px;cursor:pointer;line-height:1.5">×</button></div>`;
@@ -673,7 +736,9 @@ function renderFwCharts(){
   const byMon={};allD.forEach(d=>{const mo=d.substring(0,7);if(!byMon[mo]||d>byMon[mo])byMon[mo]=d;});
   const monthEnds=new Set(Object.values(byMon));
   const inCore=d=>!coreStart||(d>=coreStart&&d<=coreEnd);
-  const labels=allD.map(d=>{const dt=new Date(d);const lbl=`${dt.getMonth()+1}/${dt.getDate()}`;return lbl;});
+  const multiYear=new Set(allD.map(d=>d.substring(0,4))).size>1;
+  const parseD=d=>{const p=d.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);return p?[+p[1],+p[2],+p[3]]:null;};
+  const labels=allD.map(d=>{const p=parseD(d);if(!p)return d;const[,y,m,day]=p;return(multiYear&&monthEnds.has(d))?`'${String(y).slice(2)}/${m}/${day}`:`${m}/${day}`;});
   const mkDS=()=>ACCOUNTS.map(a=>{
     const m={};(followerLog[a.name]||[]).forEach(e=>m[e.date]=e.count);
     const ptR=allD.map(d=>monthEnds.has(d)?7:2);
@@ -709,7 +774,7 @@ function renderFwTable(){
     allD=[...new Set(ACCOUNTS.flatMap(a=>(followerLog[a.name]||[]).map(e=>e.date)))].sort();
   }
   if(!allD.length){document.getElementById('fwTable').innerHTML='<tr><td style="padding:20px;color:var(--text3);font-size:12px">フォロワーデータがありません</td></tr>';return;}
-  const byMon={};allD.forEach(d=>{const mo=d.substring(0,7);if(!byMon[mo]||d>byMon[mo])byMon[mo]=d;});
+  const byMon={};allD.forEach(d=>{const mo=d.substring(0,7),ds=d.substring(0,10);if(!byMon[mo]||ds>byMon[mo])byMon[mo]=ds;});
   const monthEnds=new Set(Object.values(byMon));
   const inCore=d=>!coreStart||(d>=coreStart&&d<=coreEnd);
   const th=`<thead><tr><th class="left">日付</th>${ACCOUNTS.map(a=>`<th style="color:${a.color};text-align:right">${a.name}</th><th style="color:${a.color};text-align:right;opacity:.6">前回比</th>`).join('')}</tr></thead>`;
