@@ -793,14 +793,15 @@ function deleteFw(name,date){
 function renderFwCharts(){
   dchart(['fwTrend','fwDelta']);
   const period=document.getElementById('fwPeriodSel')?.value||'all';
-  let coreStart=null,coreEnd=null,allRaw;
+  let coreStart=null,coreEnd=null;
+  // 全日付を収集（parseLocalDate で正規化して YYYY-MM-DD に揃える）
+  const normDate=d=>{const dt=parseLocalDate(d);if(!dt)return null;return`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;};
+  let allRaw=[...new Set(ACCOUNTS.flatMap(a=>(followerLog[a.name]||[]).map(e=>normDate(e.date)).filter(Boolean)))].sort();
   if(period.startsWith('fy')){
     const fy=+period.slice(2);
     coreStart=`${fy}-06-01`;coreEnd=`${fy+1}-05-31`;
     const bufStart=`${fy}-03-01`,bufEnd=`${fy+1}-08-31`;
-    allRaw=[...new Set(ACCOUNTS.flatMap(a=>(followerLog[a.name]||[]).map(e=>e.date)))].filter(d=>d>=bufStart&&d<=bufEnd).sort();
-  } else {
-    allRaw=[...new Set(ACCOUNTS.flatMap(a=>(followerLog[a.name]||[]).map(e=>e.date)))].sort();
+    allRaw=allRaw.filter(d=>d>=bufStart&&d<=bufEnd);
   }
   if(!allRaw.length)return;
   // 月ごとに最末日付だけ残す（月別グラフ）
@@ -808,10 +809,14 @@ function renderFwCharts(){
   const allD=Object.values(byMon).sort();
   const inCore=d=>!coreStart||(d>=coreStart&&d<=coreEnd);
   const multiYear=new Set(allD.map(d=>d.substring(0,4))).size>1;
-  // ラベル: 5月, 6月, ... (複数年は '25/6月 形式)
   const labels=allD.map(d=>{const y=+d.substring(0,4),m=+d.substring(5,7);return multiYear?`'${String(y).slice(2)}/${m}月`:`${m}月`;});
+  // アカウント別に正規化済み日付→件数マップを作成
+  const acctMap={};ACCOUNTS.forEach(a=>{
+    const m={};(followerLog[a.name]||[]).forEach(e=>{const nd=normDate(e.date);if(nd)m[nd]=e.count;});
+    acctMap[a.name]=m;
+  });
   const mkDS=()=>ACCOUNTS.map(a=>{
-    const mp={};(followerLog[a.name]||[]).forEach(e=>mp[e.date]=e.count);
+    const mp=acctMap[a.name];
     const ptBg=allD.map(d=>inCore(d)?a.color:a.color+'44');
     const ptBd=allD.map(d=>inCore(d)?a.color:a.color+'33');
     return{label:a.name,data:allD.map(d=>mp[d]??null),
@@ -822,16 +827,16 @@ function renderFwCharts(){
       segment:{borderColor:ctx=>{const d1=allD[ctx.p0DataIndex],d2=allD[ctx.p1DataIndex];return(inCore(d1)&&inCore(d2))?a.color:a.color+'33';}}};
   });
   const mkDD=()=>ACCOUNTS.map(a=>{
-    // 月末データのみで前月比を計算
-    const meLog=allD.map(d=>{const e=(followerLog[a.name]||[]).find(x=>x.date===d);return e?{date:d,count:e.count}:null;}).filter(Boolean);
-    const mp={};meLog.forEach((e,i)=>{if(i>0&&meLog[i-1])mp[e.date]=e.count-meLog[i-1].count;});
+    const mp=acctMap[a.name];
+    const meLog=allD.map(d=>mp[d]!=null?{date:d,count:mp[d]}:null).filter(Boolean);
+    const dm={};meLog.forEach((e,i)=>{if(i>0)dm[e.date]=e.count-meLog[i-1].count;});
     const bg=allD.map(d=>inCore(d)?a.color+'bb':a.color+'33');
     const bd=allD.map(d=>inCore(d)?a.color:a.color+'33');
-    return{label:a.name,data:allD.map(d=>mp[d]??null),backgroundColor:bg,borderColor:bd,borderWidth:1,spanGaps:false};});
+    return{label:a.name,data:allD.map(d=>dm[d]??null),backgroundColor:bg,borderColor:bd,borderWidth:1,spanGaps:false};});
   const mkLeg=id=>document.getElementById(id).innerHTML=ACCOUNTS.map(a=>`<span class="legend-item"><span class="legend-sq" style="background:${a.color}"></span>${a.name}</span>`).join('');
   mkLeg('fwChartLegend');mkLeg('fwDeltaLegend');
-  charts.fwTrend=new Chart(document.getElementById('fwTrendChart'),{type:'line',data:{labels,datasets:mkDS()},options:bOpts()});
-  charts.fwDelta=new Chart(document.getElementById('fwDeltaChart'),{type:'bar',data:{labels,datasets:mkDD()},options:{...bOpts(),plugins:{legend:{display:false}}}});
+  try{charts.fwTrend=new Chart(document.getElementById('fwTrendChart'),{type:'line',data:{labels,datasets:mkDS()},options:bOpts()});}catch(e){console.error('fwTrend chart error:',e);}
+  try{charts.fwDelta=new Chart(document.getElementById('fwDeltaChart'),{type:'bar',data:{labels,datasets:mkDD()},options:{...bOpts(),plugins:{legend:{display:false}}}});}catch(e){console.error('fwDelta chart error:',e);}
 }
 function renderFwTable(){
   const period=document.getElementById('fwPeriodSel')?.value||'all';
