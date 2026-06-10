@@ -768,22 +768,24 @@ function syncBestPeriod(){
   const rows=acct?allData.filter(r=>r.account===acct):allData;
   const sel=document.getElementById('bestPeriod');if(!sel)return;
   const cur=sel.value;
+  // 日付を正規化（"Wed May 19 2026" や "2026-05-19 07:00" 両対応）
+  const toNorm=d=>{const ms=Date.parse(d);if(isNaN(ms))return null;const dt=new Date(ms);return dt;};
   let opts=[];
   if(type==='month'){
-    opts=[...new Set(rows.map(r=>r.date.substring(0,7)))].filter(Boolean).sort().reverse();
+    const mset=new Set();
+    rows.forEach(r=>{const dt=toNorm(r.date);if(!dt)return;
+      mset.add(`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`);});
+    opts=[...mset].sort().reverse();
     sel.innerHTML=opts.map(m=>`<option value="${m}">${m}</option>`).join('');
   }else{
-    // 週: 月曜始まりでYYYY-MM-DD形式のキー
     const wks=new Set();
-    rows.forEach(r=>{
-      const d=new Date(r.date.substring(0,10));if(isNaN(d))return;
-      const day=d.getDay();const mon=new Date(d);mon.setDate(d.getDate()-(day===0?6:day-1));
+    rows.forEach(r=>{const dt=toNorm(r.date);if(!dt)return;
+      const day=dt.getDay();const mon=new Date(dt);mon.setDate(dt.getDate()-(day===0?6:day-1));
       const y=mon.getFullYear(),m=String(mon.getMonth()+1).padStart(2,'0'),dd=String(mon.getDate()).padStart(2,'0');
-      wks.add(`${y}-${m}-${dd}`);
-    });
+      wks.add(`${y}-${m}-${dd}`);});
     opts=[...wks].sort().reverse();
-    const end=w=>{const d=new Date(w);d.setDate(d.getDate()+6);return`${d.getMonth()+1}/${d.getDate()}`;};
-    sel.innerHTML=opts.map(w=>{const d=new Date(w);return`<option value="${w}">${d.getMonth()+1}/${d.getDate()}〜${end(w)}</option>`;}).join('');
+    const endStr=w=>{const d=new Date(w);d.setDate(d.getDate()+6);return`${d.getMonth()+1}/${d.getDate()}`;};
+    sel.innerHTML=opts.map(w=>{const d=new Date(w);return`<option value="${w}">${d.getMonth()+1}/${d.getDate()}〜${endStr(w)}</option>`;}).join('');
   }
   if(opts.includes(cur))sel.value=cur;
 }
@@ -794,11 +796,13 @@ function renderBest(){
   const period=document.getElementById('bestPeriod')?.value||'';
   if(!period){el.innerHTML='<p style="color:var(--text3);padding:24px">データがありません</p>';return;}
   let rows=acct?allData.filter(r=>r.account===acct):allData;
+  const toD=s=>{const ms=Date.parse(s);return isNaN(ms)?null:new Date(ms);};
   if(type==='month'){
-    rows=rows.filter(r=>r.date.startsWith(period));
+    const [py,pm]=period.split('-').map(Number);
+    rows=rows.filter(r=>{const d=toD(r.date);return d&&d.getFullYear()===py&&d.getMonth()+1===pm;});
   }else{
     const monD=new Date(period);const sunD=new Date(period);sunD.setDate(sunD.getDate()+6);
-    rows=rows.filter(r=>{const d=new Date(r.date.substring(0,10));return d>=monD&&d<=sunD;});
+    rows=rows.filter(r=>{const d=toD(r.date);return d&&d>=monD&&d<=sunD;});
   }
   if(!rows.length){el.innerHTML='<p style="color:var(--text3);padding:24px">該当期間のデータがありません</p>';return;}
   const TOP=5;
