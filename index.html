@@ -944,9 +944,13 @@ async function apiGet(action) {
 }
 
 async function apiPost(body) {
-  // GASはGET経由でPOST操作を受け付ける
-  const url = GAS_API_URL + '?method=POST&body=' + encodeURIComponent(JSON.stringify(body));
-  const res = await fetch(url, { redirect: 'follow' });
+  // Content-Type: text/plain → プリフライトなしでPOST可能、URLサイズ制限なし
+  const res = await fetch(GAS_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify(body),
+    redirect: 'follow'
+  });
   const text = await res.text();
   return JSON.parse(text);
 }
@@ -988,7 +992,7 @@ async function loadFromSheet() {
 // CSVインポート後にスプレッドシートへ保存
 async function savePostsToSheet(rows) {
   if (!isApiConfigured()) return;
-  const CHUNK = 20;
+  const CHUNK = 50;
   const toSave = rows.map(r => ({...r, er: r.impressions>0?(r.engagements/r.impressions*100):0}));
   let totalAdded=0, totalSkipped=0;
   showSyncStatus('保存中...', 'loading');
