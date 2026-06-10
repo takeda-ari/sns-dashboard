@@ -988,15 +988,20 @@ async function loadFromSheet() {
 // CSVインポート後にスプレッドシートへ保存
 async function savePostsToSheet(rows) {
   if (!isApiConfigured()) return;
+  const CHUNK = 20;
+  const toSave = rows.map(r => ({...r, er: r.impressions>0?(r.engagements/r.impressions*100):0}));
+  let totalAdded=0, totalSkipped=0;
   showSyncStatus('保存中...', 'loading');
   try {
-    const toSave = rows.map(r => ({
-      ...r,
-      er: r.impressions > 0 ? (r.engagements / r.impressions * 100) : 0
-    }));
-    const res = await apiPost({ action:'addPosts', rows: toSave });
-    if (res.error) throw new Error(res.error);
-    showSyncStatus(`✓ ${res.added}件保存（重複${res.skipped}件スキップ）`, 'ok');
+    for (let i=0; i<toSave.length; i+=CHUNK) {
+      const chunk = toSave.slice(i, i+CHUNK);
+      showSyncStatus(`保存中... ${Math.min(i+CHUNK,toSave.length)}/${toSave.length}件`, 'loading');
+      const res = await apiPost({ action:'addPosts', rows: chunk });
+      if (res.error) throw new Error(res.error);
+      totalAdded += res.added||0;
+      totalSkipped += res.skipped||0;
+    }
+    showSyncStatus(`✓ ${totalAdded}件保存（重複${totalSkipped}件スキップ）`, 'ok');
   } catch(err) {
     showSyncStatus('保存エラー: ' + err.message, 'error');
   }
